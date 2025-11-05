@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="purchase_order_form_intermediate_state" model="ir.ui.view">
+            <field name="name">purchase.order.form.intermediate.state</field>
+            <field name="model">purchase.order</field>
+            <field name="inherit_id" ref="purchase.purchase_order_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='state']" position="attributes">
+                    <attribute name="statusbar_visible">draft,sent,intermediate,purchase</attribute>
+                </xpath>
+                <xpath expr="//button[@name='button_confirm']" position="before">
+                    <button name="run_custom_logic_before_confirm"
+                            string="Pasar a Pendiente"
+                            class="oe_highlight"
+                            type="object"
+                            help="Mueve el pedido al estado intermedio para una revisión final antes de confirmar."/>
+                </xpath>
+
+                <xpath expr="//button[@name='button_confirm']" position="before">
+                    <button name="action_set_to_inicial_presupuesto"
+                            string="Dividir por proveedor"
+                            class="oe_highlight"
+                            type="object"
+                            help="Mueve el pedido al estado Inicial para una revisión final antes de confirmar."/>
+                </xpath>
+
+                <xpath expr="//button[@name='button_confirm']" position="attributes">
+                    <attribute name="invisible">state != 'intermediate'</attribute>
+                </xpath>
+
+
+
+
+            </field>
+        </record>
+
+
+    </data>
+</odoo>
+

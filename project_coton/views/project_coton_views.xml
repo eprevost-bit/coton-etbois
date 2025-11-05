@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="project_edit_project_inherit_sales_purchases" model="ir.ui.view">
+            <field name="name">project.project.form.inherit.sales.purchases</field>
+            <field name="model">project.project</field>
+            <field name="inherit_id" ref="project.edit_project"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='description']" position="replace"/>
+                <xpath expr="//notebook" position="inside">
+                    <page string="Análisis Económico por Línea" name="unified_lines">
+                        <field name="unified_line_ids" nolabel="1">
+                            <list editable="bottom" create="false" delete="false">
+                                <field name="reference" string="Referencia"/>
+                                <field name="line_description" string="Descripción"/>
+                                <field name="currency_id" column_invisible="1"/>
+
+                                <field name="quantity" string="Cantidad"/>
+
+                                <field name="sale_amount" string="Importe Venta (Sin IVA)" />
+<!--                                <field name="sale_invoiced_percentage" string="Importe Facturado" sum="Facturado" widget="porcentaje"/>-->
+                                <field name="sale_total_invoiced" string="Total Facturado" />
+<!--                                <field name="sale_paid_percentage" string="Cobrado" widget="progressbar"/>-->
+                                <field name="sale_paid_amount" string="Importe Cobrado" />
+
+                                <field name="purchase_amount" string="Importe Compra (Sin IVA)" />
+                                <field name="purchase_total_invoiced" string="Facturado de Compra" />
+<!--                                <field name="purchase_paid_percentage" string="Pagado" widget="progressbar"/>-->
+                                <field name="purchase_paid_amount" string="Importe Pagado" widget="monetary"/>
+                            </list>
+                        </field>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
