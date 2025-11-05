@@ -1,8 +1,8 @@
-# Módulo Personalizado: Coton et Bois para Odoo 18
+# Módulo Personalizado: Coton et Bois para Odoo 18-19
 
 ## Descripción General
 
-Este módulo introduce personalizaciones y nuevas funcionalidades a los flujos de Compras y Ventas de Odoo 18, diseñadas para optimizar los procesos específicos de "Coton et Bois".
+Este módulo introduce personalizaciones y nuevas funcionalidades a los flujos de Compras y Ventas de Odoo 18 - 19, diseñadas para optimizar los procesos específicos de "Coton et Bois".
 
 Las principales mejoras se centran en la capacidad de gestionar presupuestos de compra complejos y en añadir un nivel de detalle granular a las líneas de los pedidos de venta.
 
