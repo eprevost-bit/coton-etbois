@@ -26,7 +26,7 @@
 
         <xpath expr="//div[hasclass('o_field_product_label_section_and_note_cell')]" position="after">
             <div t-if="isSection(record)">
-                <t t-set="item" t-value="this.countItemUnderSection()"/>
+<!--                <t t-set="item" t-value="this.countItemUnderSection()"/>-->
                 <span t-if="state.count_item_under_section > 0" class="item_count_under_section me-5">
                     <span class="me-1"><t t-out="state.count_item_under_section"/></span><span t-if="state.count_item_under_section > 1">items</span><span t-else="">item</span>
                 </span>
