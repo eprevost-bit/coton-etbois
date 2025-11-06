@@ -12,12 +12,7 @@ patch(SaleOrderLineProductField.prototype, {
 
         // *** AÑADE ESTO ***
         // Llama a la función de conteo ANTES de que el componente se renderice
-        onWillStart(async () => {
-            // Solo ejecuta la lógica si es una sección
-            if (this.isSection(this.props.record)) {
-                await this.countItemUnderSection();
-            }
-        });
+
     },
 
     async countItemUnderSection () {
@@ -27,9 +22,4 @@ patch(SaleOrderLineProductField.prototype, {
             record: this.props.record
         });
     },
-    isSection(record) {
-        // La plantilla pasa 'record', pero por si acaso, usamos this.props.record como fallback
-        const rec = record || this.props.record;
-        return rec.data.display_type === 'line_section';
-    }
 });
