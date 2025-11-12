@@ -103,6 +103,63 @@
                             <h3>RESUMEN DE PRESUPUESTO</h3>
                         </div>
 
+                        <!--                        <table class="summary-table table-borderless"-->
+                        <!--                               style="width: 100%; margin-top: 10px; border-collapse: collapse;">-->
+                        <!--                            <thead style="border-bottom: 1px solid #999;">-->
+                        <!--                                <tr>-->
+                        <!--                                    <th style="width:10%; text-align:left; font-weight:bold; border:none;">CAPÍTULO</th>-->
+                        <!--                                    <th style="text-align:left; font-weight:bold; border:none;">RESUMEN</th>-->
+                        <!--                                    <th class="text-end"-->
+                        <!--                                        style="width:20%; text-align:right; font-weight:bold; border:none;">IMPORTE-->
+                        <!--                                    </th>-->
+                        <!--                                </tr>-->
+                        <!--                            </thead>-->
+                        <!--                            <tbody>-->
+                        <!--                                <t t-set="current_section_line" t-value="None"/>-->
+                        <!--                                <t t-set="current_subtotal" t-value="0.0"/>-->
+                        <!--                                <t t-set="section_index" t-value="1"/>-->
+
+                        <!--                                <t t-foreach="doc.order_line" t-as="line">-->
+                        <!--                                    <t t-if="line.display_type == 'line_section'">-->
+                        <!--                                        <t t-if="current_section_line">-->
+                        <!--                                            <tr>-->
+                        <!--                                                <td style="text-align:left; border:none;">-->
+                        <!--                                                    <span t-esc="'%02d' % (section_index - 1)"/>-->
+                        <!--                                                </td>-->
+                        <!--                                                <td style="text-align:left; border:none;">-->
+                        <!--                                                    <strong t-field="current_section_line.name"/>-->
+                        <!--                                                </td>-->
+                        <!--                                                <td class="text-end" style="text-align:right; border:none;">-->
+                        <!--                                                    <span t-esc="current_subtotal"-->
+                        <!--                                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>-->
+                        <!--                                                </td>-->
+                        <!--                                            </tr>-->
+                        <!--                                        </t>-->
+                        <!--                                        <t t-set="current_section_line" t-value="line"/>-->
+                        <!--                                        <t t-set="current_subtotal" t-value="0.0"/>-->
+                        <!--                                        <t t-set="section_index" t-value="section_index + 1"/>-->
+                        <!--                                    </t>-->
+                        <!--                                    <t t-else="">-->
+                        <!--                                        <t t-set="current_subtotal" t-value="current_subtotal + line.price_subtotal"/>-->
+                        <!--                                    </t>-->
+                        <!--                                </t>-->
+
+                        <!--                                <t t-if="current_section_line">-->
+                        <!--                                    <tr>-->
+                        <!--                                        <td style="text-align:left; border:none;">-->
+                        <!--                                            <span t-esc="'%02d' % (section_index - 1)"/>-->
+                        <!--                                        </td>-->
+                        <!--                                        <td style="text-align:left; border:none;">-->
+                        <!--                                            <strong t-field="current_section_line.name"/>-->
+                        <!--                                        </td>-->
+                        <!--                                        <td class="text-end" style="text-align:right; border:none;">-->
+                        <!--                                            <span t-esc="current_subtotal"-->
+                        <!--                                                  t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>-->
+                        <!--                                        </td>-->
+                        <!--                                    </tr>-->
+                        <!--                                </t>-->
+                        <!--                            </tbody>-->
+                        <!--                        </table>-->
                         <table class="summary-table table-borderless"
                                style="width: 100%; margin-top: 10px; border-collapse: collapse;">
                             <thead style="border-bottom: 1px solid #999;">
@@ -116,11 +173,31 @@
                             </thead>
                             <tbody>
                                 <t t-set="current_section_line" t-value="None"/>
-                                <t t-set="current_subtotal" t-value="0.0"/>
+                                <t t-set="section_subtotal" t-value="0.0"/>
                                 <t t-set="section_index" t-value="1"/>
 
+                                <t t-set="current_subsection_line" t-value="None"/>
+                                <t t-set="subsection_subtotal" t-value="0.0"/>
+                                <t t-set="subsection_index" t-value="1"/>
+
                                 <t t-foreach="doc.order_line" t-as="line">
+
                                     <t t-if="line.display_type == 'line_section'">
+                                        <t t-if="current_subsection_line">
+                                            <tr style="font-size: 0.9em;">
+                                                <td style="text-align:left; border:none; padding-left: 20px;">
+                                                    <span t-esc="'%02d.%d' % (section_index - 1, subsection_index - 1)"/>
+                                                </td>
+                                                <td style="text-align:left; border:none; padding-left: 20px;">
+                                                    <span t-field="current_subsection_line.name"/>
+                                                </td>
+                                                <td class="text-end" style="text-align:right; border:none;">
+                                                    <span t-esc="subsection_subtotal"
+                                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                                </td>
+                                            </tr>
+                                        </t>
+
                                         <t t-if="current_section_line">
                                             <tr>
                                                 <td style="text-align:left; border:none;">
@@ -130,18 +207,66 @@
                                                     <strong t-field="current_section_line.name"/>
                                                 </td>
                                                 <td class="text-end" style="text-align:right; border:none;">
-                                                    <span t-esc="current_subtotal"
+                                                    <span t-esc="section_subtotal"
                                                           t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                                 </td>
                                             </tr>
                                         </t>
+
                                         <t t-set="current_section_line" t-value="line"/>
-                                        <t t-set="current_subtotal" t-value="0.0"/>
+                                        <t t-set="section_subtotal" t-value="0.0"/>
                                         <t t-set="section_index" t-value="section_index + 1"/>
+
+                                        <t t-set="current_subsection_line" t-value="None"/>
+                                        <t t-set="subsection_subtotal" t-value="0.0"/>
+                                        <t t-set="subsection_index" t-value="1"/>
                                     </t>
+
+                                    <t t-elif="line.display_type == 'line_subsection'">
+                                        <t t-if="current_subsection_line">
+                                            <tr style="font-size: 0.9em;">
+                                                <td style="text-align:left; border:none; padding-left: 20px;">
+                                                    <span t-esc="'%02d.%d' % (section_index - 1, subsection_index - 1)"/>
+                                                </td>
+                                                <td style="text-align:left; border:none; padding-left: 20px;">
+                                                    <span t-field="current_subsection_line.name"/>
+                                                </td>
+                                                <td class="text-end" style="text-align:right; border:none;">
+                                                    <span t-esc="subsection_subtotal"
+                                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                                </td>
+                                            </tr>
+                                        </t>
+
+                                        <t t-set="current_subsection_line" t-value="line"/>
+                                        <t t-set="subsection_subtotal" t-value="0.0"/>
+                                        <t t-set="subsection_index" t-value="subsection_index + 1"/>
+
+                                    </t>
+
                                     <t t-else="">
-                                        <t t-set="current_subtotal" t-value="current_subtotal + line.price_subtotal"/>
+                                        <t t-set="section_subtotal" t-value="section_subtotal + line.price_subtotal"/>
+
+                                        <t t-if="current_subsection_line">
+                                            <t t-set="subsection_subtotal"
+                                               t-value="subsection_subtotal + line.price_subtotal"/>
+                                        </t>
                                     </t>
+                                </t>
+
+                                <t t-if="current_subsection_line">
+                                    <tr style="font-size: 0.9em;">
+                                        <td style="text-align:left; border:none; padding-left: 20px;">
+                                            <span t-esc="'%02d.%d' % (section_index - 1, subsection_index - 1)"/>
+                                        </td>
+                                        <td style="text-align:left; border:none; padding-left: 20px;">
+                                            <span t-field="current_subsection_line.name"/>
+                                        </td>
+                                        <td class="text-end" style="text-align:right; border:none;">
+                                            <span t-esc="subsection_subtotal"
+                                                  t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                        </td>
+                                    </tr>
                                 </t>
 
                                 <t t-if="current_section_line">
@@ -153,14 +278,13 @@
                                             <strong t-field="current_section_line.name"/>
                                         </td>
                                         <td class="text-end" style="text-align:right; border:none;">
-                                            <span t-esc="current_subtotal"
+                                            <span t-esc="section_subtotal"
                                                   t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                         </td>
                                     </tr>
                                 </t>
                             </tbody>
                         </table>
-
 
                         <!-- Totales -->
                         <div class="total_summ_tb_font" id="totals_summary_table"
@@ -352,18 +476,18 @@
 
         <script>
             function subst() {
-            var vars = {};
-            var x = document.location.search.substring(1).split('&amp;');
-            for (var i in x) {
-            var z = x[i].split('=', 2);
-            vars[z[0]] = unescape(z[1]);
-            }
-            if (vars['page'] == 1) {
-            document.body.classList.add('first_page');
-            } else {
-            document.body.classList.add('other_page');
-            }
-            return vars;
+                var vars = {};
+                var x = document.location.search.substring(1).split('&amp;');
+                for (var i in x) {
+                    var z = x[i].split('=', 2);
+                    vars[z[0]] = unescape(z[1]);
+                }
+                if (vars['page'] == 1) {
+                    document.body.classList.add('first_page');
+                } else {
+                    document.body.classList.add('other_page');
+                }
+                return vars;
             }
         </script>
     </template>
