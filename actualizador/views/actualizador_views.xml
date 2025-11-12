@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="contact_updater_wizard_form_view" model="ir.ui.view">
+        <field name="name">contact.updater.wizard.form</field>
+        <field name="model">contact.updater.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Actualizar Posiciones Fiscales">
+                <group>
+                    <field name="file_data" filename="file_name"/>
+                    <field name="file_name" invisible="1"/>
+                </group>
+                <footer>
+                    <button name="action_update_contacts"
+                            type="object"
+                            string="Importar y Actualizar"
+                            class="oe_highlight"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_open_contact_updater_wizard" model="ir.actions.act_window">
+        <field name="name">Actualizar Posición Fiscal (XLSX)</field>
+        <field name="res_model">contact.updater.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field> </record>
+
+    <menuitem
+        id="menu_contact_updater_wizard"
+        name="Actualizar Posición Fiscal"
+        parent="contacts.menu_contacts"
+        action="action_open_contact_updater_wizard"
+        sequence="100"/>
+
+    </odoo>
