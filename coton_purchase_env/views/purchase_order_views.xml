@@ -12,11 +12,17 @@
                 </xpath>
 
                 <xpath expr="//header" position="inside">
+                    <button name="action_create_invoice"
+                            type="object"
+                            string="Crear Factura"
+                            class="oe_highlight"
+                    />
                     <button name="action_send_items_by_email"
                             type="object"
                             string="Enviar Partidas por Correo"
                             class="oe_highlight"
                     />
+
                 </xpath>
 
 <!--                <xpath expr="//field[@name='order_line']/tree/field[@name='name']" position="before">-->
