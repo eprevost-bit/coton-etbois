@@ -135,7 +135,13 @@ class PurchaseOrderCustom(models.Model):
                 if line.display_type == 'line_section':
                     pending_section = line
                     continue
-                if not float_is_zero(line.qty_to_invoice, precision_digits=precision):
+                # Adaptación Odoo 19: El campo qty_to_invoice puede no existir
+                # Si usas la lógica de Odoo 19, deberías basarte en 'qty_billable' o similar.
+                # Por ahora, mantendremos tu lógica original asumiendo que el campo existe.
+                qty_to_invoice = line.qty_to_invoice if hasattr(line,
+                                                                'qty_to_invoice') else line.qty_received - line.qty_invoiced
+
+                if not float_is_zero(qty_to_invoice, precision_digits=precision):
                     if pending_section:
                         line_vals = pending_section._prepare_account_move_line()
                         line_vals.update({'sequence': sequence})
@@ -149,11 +155,15 @@ class PurchaseOrderCustom(models.Model):
             invoice_vals_list.append(invoice_vals)
 
         if not invoice_vals_list:
-            raise UserError(_('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
+            raise UserError(
+                _('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
 
         # 2) group by (company_id, partner_id, currency_id) for batch creation
+        #    *** INICIO DE LA CORRECCIÓN ***
         new_invoice_vals_list = []
-        for grouping_keys, invoices in groupby(invoice_vals_list, key=lambda x: (x.get('company_id'), x.get('partner_id'), x.get('currency_id'))):
+        for grouping_keys, invoices in groupby(invoice_vals_list,
+                                               key=lambda x: (x.get('company_id'), x.get('partner_id'),
+                                                              x.get('currency_id'))):
             origins = set()
             payment_refs = set()
             refs = set()
@@ -163,16 +173,26 @@ class PurchaseOrderCustom(models.Model):
                     ref_invoice_vals = invoice_vals
                 else:
                     ref_invoice_vals['invoice_line_ids'] += invoice_vals['invoice_line_ids']
-                origins.add(invoice_vals['invoice_origin'])
-                payment_refs.add(invoice_vals['payment_reference'])
-                refs.add(invoice_vals['ref'])
+
+                # Usamos .get() para obtener valores de forma segura
+                origins.add(invoice_vals.get('invoice_origin', ''))  # invoice_origin debe existir, pero por seguridad
+
+                payment_ref = invoice_vals.get('payment_reference')
+                if payment_ref:
+                    payment_refs.add(payment_ref)
+
+                ref = invoice_vals.get('ref')
+                if ref:
+                    refs.add(ref)
+
             ref_invoice_vals.update({
-                'ref': ', '.join(refs)[:2000],
-                'invoice_origin': ', '.join(origins),
+                'ref': ', '.join(filter(None, refs))[:2000],  # Filtramos Nones/strings vacíos
+                'invoice_origin': ', '.join(filter(None, origins)),
                 'payment_reference': len(payment_refs) == 1 and payment_refs.pop() or False,
             })
             new_invoice_vals_list.append(ref_invoice_vals)
         invoice_vals_list = new_invoice_vals_list
+        #    *** FIN DE LA CORRECCIÓN ***
 
         # 3) Create invoices.
         moves = self.env['account.move']
@@ -181,8 +201,6 @@ class PurchaseOrderCustom(models.Model):
             moves |= AccountMove.with_company(vals['company_id']).create(vals)
 
         # 4) Some moves might actually be refunds: convert them if the total amount is negative
-        # We do this after the moves have been created since we need taxes, etc. to know if the total
-        # is actually negative or not
         moves.filtered(lambda m: m.currency_id.round(m.amount_total) < 0).action_switch_move_type()
 
         return self.action_view_invoice(moves)
