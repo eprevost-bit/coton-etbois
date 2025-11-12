@@ -79,24 +79,65 @@ class SaleOrderLine(models.Model):
     @api.depends('order_id.order_line', 'order_id.order_line.display_type', 'order_id.order_line.sequence')
     def _compute_line_number_display(self):
         """
-        Calcula y asigna la numeración jerárquica a las líneas de una orden de venta.
+        Calcula y asigna la numeración jerárquica (hasta 3 niveles)
+        para líneas de orden de venta, incluyendo subsecciones (Odoo 19+).
         """
-        # Agrupamos las líneas por su orden de venta para procesarlas en bloque.
         for order in self.mapped('order_id'):
-            main_counter = 0
-            sub_counter = 1
-            # Es crucial obtener las líneas ordenadas por su secuencia.
+            main_counter = 0  # Contador para Nivel 1 (Sección)
+            sub_counter_l1 = 1  # Contador para Nivel 2 (Subsección o Producto)
+            sub_counter_l2 = 1  # Contador para Nivel 3 (Producto bajo Subsección)
+
+            prefix_l1 = ""  # Almacenará "1", "2", etc.
+            prefix_l2 = ""  # Almacenará "1.1", "1.2", etc. (el prefijo de la subsección activa)
+
             for line in order.order_line.sorted('sequence'):
-                # Si la línea es una SECCIÓN (ej: "Obra")
+
+                # 1. Nivel 1: SECCIÓN ('line_section')
                 if line.display_type == 'line_section':
                     main_counter += 1
-                    sub_counter = 1  # Reiniciamos el contador de sub-líneas
-                    line.line_number_display = str(main_counter)
-                # Si es una línea de producto normal y ya hemos pasado por una sección
-                elif line.display_type is False and main_counter > 0:
-                    line.line_number_display = f"{main_counter}.{sub_counter}"
-                    sub_counter += 1
-                # Para cualquier otro caso (notas, o líneas antes de la primera sección)
+                    sub_counter_l1 = 1  # Reinicia contador Nivel 2
+                    sub_counter_l2 = 1  # Reinicia contador Nivel 3
+
+                    prefix_l1 = str(main_counter)
+                    prefix_l2 = ""  # Limpia el prefijo de subsección
+
+                    line.line_number_display = prefix_l1
+
+                # 2. Nivel 2: SUB-SECCIÓN ('line_subsection')
+                elif line.display_type == 'line_subsection':
+                    # Si no hay una sección padre, no la numeramos
+                    if not prefix_l1:
+                        line.line_number_display = ""
+                        continue
+
+                    # Formamos el prefijo Nivel 2, ej: "1.1"
+                    current_prefix = f"{prefix_l1}.{sub_counter_l1}"
+                    prefix_l2 = current_prefix  # Guardamos este prefijo para los hijos (Nivel 3)
+
+                    sub_counter_l1 += 1  # Incrementa contador Nivel 2
+                    sub_counter_l2 = 1  # Reinicia contador Nivel 3 para esta nueva subsección
+
+                    line.line_number_display = current_prefix
+
+                # 3. Nivel 3 o Nivel 2: LÍNEA DE PRODUCTO (False) o NOTA ('line_note')
+                elif line.display_type is False or line.display_type == 'line_note':
+                    # Si no hay una sección padre, no la numeramos
+                    if not prefix_l1:
+                        line.line_number_display = ""
+                        continue
+
+                    # Comprobamos si estamos DENTRO de una subsección activa
+                    if prefix_l2:
+                        # Estamos en Nivel 3 (ej: "1.1.1")
+                        line.line_number_display = f"{prefix_l2}.{sub_counter_l2}"
+                        sub_counter_l2 += 1
+                    else:
+                        # Estamos en Nivel 2 (ej: "1.1")
+                        line.line_number_display = f"{prefix_l1}.{sub_counter_l1}"
+                        sub_counter_l1 += 1
+                        # Nota: Una línea de producto normal NO establece el prefijo l2
+
+                # 4. Cualquier otro caso (líneas antes de la primera sección)
                 else:
                     line.line_number_display = ''
 
