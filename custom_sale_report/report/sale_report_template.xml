@@ -429,7 +429,7 @@
                                     <t t-set="subsection_total" t-value="0.0"/> <t t-set="last_subsection_name"
                                                                                    t-value="line.name"/>
                                     <tr class="subsection-row" style="font-size: 0.95em;">
-                                        <td colspan="5" style="padding-left: 40px; background-color: #f0f0f0;">
+                                        <td colspan="5" style="padding-left: 40px; background-color: #dadfc8;;">
                                             <strong><span t-field="line.name"/></strong>
                                         </td>
                                     </tr>
