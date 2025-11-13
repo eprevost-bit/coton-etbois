@@ -348,7 +348,6 @@
                         <t t-call="custom_sale_report.report_sale_order_aclaraciones"/>
                     </div>
 
-                    <!-- Detalle de productos -->
                     <div class="page">
                         <table class="table table-sm table-borderless" id="sale_order_table" style="width:100%;">
                             <thead>
@@ -362,103 +361,139 @@
                             </thead>
                             <tbody>
 
-                                <!-- Inicializamos subtotal de sección y bandera de primera sección -->
-                                <t t-set="section_total" t-value="0"/>
-                                <t t-set="is_first_section" t-value="True"/>
+                                <t t-set="section_total" t-value="0.0"/>
+                                <t t-set="subsection_total" t-value="0.0"/> <t t-set="is_first_section" t-value="True"/>
                                 <t t-set="last_section_name" t-value="'Sección'"/>
+                                <t t-set="last_subsection_name" t-value="None"/> <t t-foreach="doc.order_line"
+                                                                                    t-as="line">
 
-                                <t t-foreach="doc.order_line" t-as="line">
+                                <t t-if="line.display_type == 'line_section'">
 
-                                    <!-- Si es una línea de sección -->
-                                    <t t-if="line.display_type == 'line_section'">
-
-                                        <!-- Mostrar subtotal si NO es la primera sección -->
-                                        <t t-if="not is_first_section">
-                                            <tr class="section-subtotal">
-                                                <td colspan="4" class="text-end">
-                                                    <strong>Subtotal
-                                                        <t t-esc="last_section_name"/>
-                                                    </strong>
-                                                </td>
-                                                <td class="text-end">
-                                                    <strong>
-                                                        <t t-esc="section_total"/>
-                                                    </strong>
-                                                </td>
-                                            </tr>
-                                            <!-- Reiniciar el subtotal -->
-                                            <t t-set="section_total" t-value="0"/>
-                                        </t>
-
-                                        <t t-set="raw_section_name" t-value="line.name.split('\n')[0]"/>
-                                        <t t-set="last_section_name" t-value="raw_section_name"/>
-
-                                        <!-- Mostrar la nueva sección -->
-                                        <tr class="bg-light section-row">
-                                            <td colspan="5" style="padding-left:20px; background-color: #b1b6a0;">
+                                    <t t-if="last_subsection_name">
+                                        <tr class="subsection-subtotal" style="font-size: 0.9em;">
+                                            <td colspan="4" class="text-end" style="padding-right: 20px;">
+                                                <strong>Subtotal <t t-esc="last_subsection_name"/></strong>
+                                            </td>
+                                            <td class="text-end">
                                                 <strong>
-                                                    <span t-esc="raw_section_name"/>
+                                                    <t t-esc="subsection_total"
+                                                       t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                                 </strong>
                                             </td>
                                         </tr>
-
-                                        <!-- Ya no estamos en la primera sección -->
-                                        <t t-set="is_first_section" t-value="False"/>
+                                        <t t-set="subsection_total" t-value="0.0"/>
+                                        <t t-set="last_subsection_name" t-value="None"/>
                                     </t>
 
-                                    <!-- Si es una línea de producto -->
-                                    <t t-if="not line.display_type">
-                                        <tr>
-                                            <td>
-                                                <span t-field="line.line_number_display"/>
+                                    <t t-if="not is_first_section">
+                                        <tr class="section-subtotal">
+                                            <td colspan="4" class="text-end">
+                                                <strong>Subtotal <t t-esc="last_section_name"/></strong>
                                             </td>
-                                            <td>
-                                                <t t-set="clean_name" t-value="line.name.split('] ', 1)[-1]"/>
-                                                <t t-set="name_parts" t-value="clean_name.split('\n')"/>
-
+                                            <td class="text-end">
                                                 <strong>
-                                                    <t t-esc="name_parts[0]"/>
+                                                    <t t-esc="section_total"
+                                                       t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                                 </strong>
-
-                                                <t t-if="len(name_parts) > 1">
-                                                    <br/>
-                                                    <span class="product-description">
-                                                        <t t-esc="' '.join(name_parts[1:])"/>
-                                                    </span>
-                                                </t>
-                                            </td>
-                                            <td class="text-end details_product">
-                                                <span t-field="line.product_uom_qty"/>
-                                                <!-- <span t-field="line.product_uom" groups="uom.group_uom"/> -->
-                                            </td>
-                                            <td class="text-end details_product">
-                                                <span t-field="line.price_unit"/>
-                                            </td>
-                                            <td class="text-end details_product">
-                                                <span t-field="line.price_subtotal"/>
                                             </td>
                                         </tr>
+                                        <t t-set="section_total" t-value="0.0"/></t>
 
-                                        <!-- Sumar al subtotal de sección -->
-                                        <t t-set="section_total" t-value="section_total + line.price_subtotal"/>
-                                    </t>
+                                    <t t-set="raw_section_name" t-value="line.name.split('\n')[0]"/>
+                                    <t t-set="last_section_name" t-value="raw_section_name"/>
+                                    <tr class="bg-light section-row">
+                                        <td colspan="5" style="padding-left:20px; background-color: #b1b6a0;">
+                                            <strong>
+                                                <span t-esc="raw_section_name"/>
+                                            </strong>
+                                        </td>
+                                    </tr>
+                                    <t t-set="is_first_section" t-value="False"/>
                                 </t>
 
-                                <!-- Subtotal de la última sección -->
+                                <t t-elif="line.display_type == 'line_subsection'">
+
+                                    <t t-if="last_subsection_name">
+                                        <tr class="subsection-subtotal" style="font-size: 0.9em;">
+                                            <td colspan="4" class="text-end" style="padding-right: 20px;">
+                                                <strong>Subtotal <t t-esc="last_subsection_name"/></strong>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>
+                                                    <t t-esc="subsection_total"
+                                                       t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-set="subsection_total" t-value="0.0"/> <t t-set="last_subsection_name"
+                                                                                   t-value="line.name"/>
+                                    <tr class="subsection-row" style="font-size: 0.95em;">
+                                        <td colspan="5" style="padding-left: 40px; background-color: #f0f0f0;">
+                                            <strong><span t-field="line.name"/></strong>
+                                        </td>
+                                    </tr>
+                                </t>
+
+                                <t t-if="not line.display_type">
+                                    <tr>
+                                        <td>
+                                            <span t-field="line.line_number_display"/>
+                                        </td>
+                                        <td>
+                                            <t t-set="clean_name" t-value="line.name.split('] ', 1)[-1]"/>
+                                            <t t-set="name_parts" t-value="clean_name.split('\n')"/>
+                                            <strong>
+                                                <t t-esc="name_parts[0]"/>
+                                            </strong>
+                                            <t t-if="len(name_parts) > 1">
+                                                <br/>
+                                                <span class="product-description">
+                                                    <t t-esc="' '.join(name_parts[1:])"/>
+                                                </span>
+                                            </t>
+                                        </td>
+                                        <td class="text-end details_product">
+                                            <span t-field="line.product_uom_qty"/>
+                                        </td>
+                                        <td class="text-end details_product">
+                                            <span t-field="line.price_unit"/>
+                                        </td>
+                                        <td class="text-end details_product">
+                                            <span t-field="line.price_subtotal"/>
+                                        </td>
+                                    </tr>
+
+                                    <t t-set="section_total" t-value="section_total + line.price_subtotal"/>
+                                    <t t-set="subsection_total" t-value="subsection_total + line.price_subtotal"/></t>
+                            </t>
+
+                                <t t-if="last_subsection_name">
+                                    <tr class="subsection-subtotal" style="font-size: 0.9em;">
+                                        <td colspan="4" class="text-end" style="padding-right: 20px;">
+                                            <strong>Subtotal <t t-esc="last_subsection_name"/></strong>
+                                        </td>
+                                        <td class="text-end">
+                                            <strong>
+                                                <t t-esc="subsection_total"
+                                                   t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                            </strong>
+                                        </td>
+                                    </tr>
+                                </t>
+
                                 <tr class="section-subtotal">
                                     <td colspan="4" class="text-end">
-                                        <strong>Subtotal
-                                            <t t-esc="last_section_name"/>
-                                        </strong>
+                                        <strong>Subtotal <t t-esc="last_section_name"/></strong>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            <t t-esc="section_total"/>
+                                            <t t-esc="section_total"
+                                               t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                         </strong>
                                     </td>
                                 </tr>
 
-                                <!-- Total general -->
                                 <tr class="table-total">
                                     <td colspan="4" class="text-end">
                                         <strong>TOTAL</strong>
@@ -473,6 +508,131 @@
                             </tbody>
                         </table>
                     </div>
+                    <!-- Detalle de productos -->
+                    <!--                    <div class="page">-->
+                    <!--                        <table class="table table-sm table-borderless" id="sale_order_table" style="width:100%;">-->
+                    <!--                            <thead>-->
+                    <!--                                <tr>-->
+                    <!--                                    <th class="text-start">Código</th>-->
+                    <!--                                    <th class="text-start">Resumen</th>-->
+                    <!--                                    <th class="text-end">Cantidad</th>-->
+                    <!--                                    <th class="text-end">Precio</th>-->
+                    <!--                                    <th class="text-end">Importe</th>-->
+                    <!--                                </tr>-->
+                    <!--                            </thead>-->
+                    <!--                            <tbody>-->
+
+                    <!--                                &lt;!&ndash; Inicializamos subtotal de sección y bandera de primera sección &ndash;&gt;-->
+                    <!--                                <t t-set="section_total" t-value="0"/>-->
+                    <!--                                <t t-set="is_first_section" t-value="True"/>-->
+                    <!--                                <t t-set="last_section_name" t-value="'Sección'"/>-->
+
+                    <!--                                <t t-foreach="doc.order_line" t-as="line">-->
+
+                    <!--                                    &lt;!&ndash; Si es una línea de sección &ndash;&gt;-->
+                    <!--                                    <t t-if="line.display_type == 'line_section'">-->
+
+                    <!--                                        &lt;!&ndash; Mostrar subtotal si NO es la primera sección &ndash;&gt;-->
+                    <!--                                        <t t-if="not is_first_section">-->
+                    <!--                                            <tr class="section-subtotal">-->
+                    <!--                                                <td colspan="4" class="text-end">-->
+                    <!--                                                    <strong>Subtotal-->
+                    <!--                                                        <t t-esc="last_section_name"/>-->
+                    <!--                                                    </strong>-->
+                    <!--                                                </td>-->
+                    <!--                                                <td class="text-end">-->
+                    <!--                                                    <strong>-->
+                    <!--                                                        <t t-esc="section_total"/>-->
+                    <!--                                                    </strong>-->
+                    <!--                                                </td>-->
+                    <!--                                            </tr>-->
+                    <!--                                            &lt;!&ndash; Reiniciar el subtotal &ndash;&gt;-->
+                    <!--                                            <t t-set="section_total" t-value="0"/>-->
+                    <!--                                        </t>-->
+
+                    <!--                                        <t t-set="raw_section_name" t-value="line.name.split('\n')[0]"/>-->
+                    <!--                                        <t t-set="last_section_name" t-value="raw_section_name"/>-->
+
+                    <!--                                        &lt;!&ndash; Mostrar la nueva sección &ndash;&gt;-->
+                    <!--                                        <tr class="bg-light section-row">-->
+                    <!--                                            <td colspan="5" style="padding-left:20px; background-color: #b1b6a0;">-->
+                    <!--                                                <strong>-->
+                    <!--                                                    <span t-esc="raw_section_name"/>-->
+                    <!--                                                </strong>-->
+                    <!--                                            </td>-->
+                    <!--                                        </tr>-->
+
+                    <!--                                        &lt;!&ndash; Ya no estamos en la primera sección &ndash;&gt;-->
+                    <!--                                        <t t-set="is_first_section" t-value="False"/>-->
+                    <!--                                    </t>-->
+
+                    <!--                                    &lt;!&ndash; Si es una línea de producto &ndash;&gt;-->
+                    <!--                                    <t t-if="not line.display_type">-->
+                    <!--                                        <tr>-->
+                    <!--                                            <td>-->
+                    <!--                                                <span t-field="line.line_number_display"/>-->
+                    <!--                                            </td>-->
+                    <!--                                            <td>-->
+                    <!--                                                <t t-set="clean_name" t-value="line.name.split('] ', 1)[-1]"/>-->
+                    <!--                                                <t t-set="name_parts" t-value="clean_name.split('\n')"/>-->
+
+                    <!--                                                <strong>-->
+                    <!--                                                    <t t-esc="name_parts[0]"/>-->
+                    <!--                                                </strong>-->
+
+                    <!--                                                <t t-if="len(name_parts) > 1">-->
+                    <!--                                                    <br/>-->
+                    <!--                                                    <span class="product-description">-->
+                    <!--                                                        <t t-esc="' '.join(name_parts[1:])"/>-->
+                    <!--                                                    </span>-->
+                    <!--                                                </t>-->
+                    <!--                                            </td>-->
+                    <!--                                            <td class="text-end details_product">-->
+                    <!--                                                <span t-field="line.product_uom_qty"/>-->
+                    <!--                                                &lt;!&ndash; <span t-field="line.product_uom" groups="uom.group_uom"/> &ndash;&gt;-->
+                    <!--                                            </td>-->
+                    <!--                                            <td class="text-end details_product">-->
+                    <!--                                                <span t-field="line.price_unit"/>-->
+                    <!--                                            </td>-->
+                    <!--                                            <td class="text-end details_product">-->
+                    <!--                                                <span t-field="line.price_subtotal"/>-->
+                    <!--                                            </td>-->
+                    <!--                                        </tr>-->
+
+                    <!--                                        &lt;!&ndash; Sumar al subtotal de sección &ndash;&gt;-->
+                    <!--                                        <t t-set="section_total" t-value="section_total + line.price_subtotal"/>-->
+                    <!--                                    </t>-->
+                    <!--                                </t>-->
+
+                    <!--                                &lt;!&ndash; Subtotal de la última sección &ndash;&gt;-->
+                    <!--                                <tr class="section-subtotal">-->
+                    <!--                                    <td colspan="4" class="text-end">-->
+                    <!--                                        <strong>Subtotal-->
+                    <!--                                            <t t-esc="last_section_name"/>-->
+                    <!--                                        </strong>-->
+                    <!--                                    </td>-->
+                    <!--                                    <td class="text-end">-->
+                    <!--                                        <strong>-->
+                    <!--                                            <t t-esc="section_total"/>-->
+                    <!--                                        </strong>-->
+                    <!--                                    </td>-->
+                    <!--                                </tr>-->
+
+                    <!--                                &lt;!&ndash; Total general &ndash;&gt;-->
+                    <!--                                <tr class="table-total">-->
+                    <!--                                    <td colspan="4" class="text-end">-->
+                    <!--                                        <strong>TOTAL</strong>-->
+                    <!--                                    </td>-->
+                    <!--                                    <td class="text-end">-->
+                    <!--                                        <strong>-->
+                    <!--                                            <span t-field="doc.amount_untaxed"/>-->
+                    <!--                                        </strong>-->
+                    <!--                                    </td>-->
+                    <!--                                </tr>-->
+
+                    <!--                            </tbody>-->
+                    <!--                        </table>-->
+                    <!--                    </div>-->
 
 
                 </div>
