@@ -65,7 +65,7 @@ class ProductDescriptionUpdaterWizard(models.TransientModel):
             if product:
                 try:
                     product.write({
-                        'description': description # Actualizamos el campo 'description'
+                        'description_sale': description # Actualizamos el campo 'description'
                     })
                     updated_count += 1
                 except Exception as e:
