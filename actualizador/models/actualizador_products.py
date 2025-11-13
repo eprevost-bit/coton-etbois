@@ -56,7 +56,7 @@ class ProductDescriptionUpdaterWizard(models.TransientModel):
 
             # 3. Buscar el Producto
             # Buscamos en 'product.product' (Producto)
-            product = self.env['product.product'].search([
+            product = self.env['product.template'].search([
                 ('name', '=', name)
             ], limit=1)
 
