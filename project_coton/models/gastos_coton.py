@@ -21,13 +21,13 @@ class ProjectUnifiedLine(models.Model):
     currency_id = fields.Many2one('res.currency', string='Moneda', readonly=True)
     quantity = fields.Float(string='Cantidad', readonly=True)
     sale_amount = fields.Monetary(string='Importe Venta (Sin IVA)', readonly=True)
-    sale_invoiced_percentage = fields.Float(string='% Facturado', readonly=True, group_operator="avg")
+    sale_invoiced_percentage = fields.Float(string='% Facturado', readonly=True)
     sale_total_invoiced = fields.Monetary(string='Total Facturado Venta', readonly=True)
-    sale_paid_percentage = fields.Float(string='% Cobrado', readonly=True, group_operator="avg")
+    sale_paid_percentage = fields.Float(string='% Cobrado', readonly=True)
     sale_paid_amount = fields.Monetary(string='Importe Cobrado', readonly=True)
     purchase_amount = fields.Monetary(string='Importe Compra (Sin IVA)', readonly=True)
     purchase_total_invoiced = fields.Monetary(string='Total Facturado Compra', readonly=True)
-    purchase_paid_percentage = fields.Float(string='% Pagado', readonly=True, group_operator="avg")
+    purchase_paid_percentage = fields.Float(string='% Pagado', readonly=True)
     purchase_paid_amount = fields.Monetary(string='Importe Pagado', readonly=True)
 
     def _auto_init(self):

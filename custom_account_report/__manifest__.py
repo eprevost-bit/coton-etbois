@@ -7,15 +7,16 @@
         con un formato de portada, términos, resumen y detalle.""",
 
     'description': """
-        Este módulo crea un nuevo formato de impresión para las cotizaciones (Account Move)
-        siguiendo un diseño específico. No reemplaza el reporte original.
-    """,
+                           Este módulo crea un nuevo formato de impresión para las cotizaciones (Account Move)
+                           siguiendo un diseño específico. No reemplaza el reporte original.
+                       """,
 
     'author': "Tu Nombre Aquí",
     'website': "https://www.tuempresa.com",
 
     # Categoria del módulo
     'category': 'Accounting',
+    'license': 'LGPL-3',
     'version': '1.0',
 
     # Dependencias: nuestro módulo necesita el módulo de Ventas ('sale_management') para funcionar
