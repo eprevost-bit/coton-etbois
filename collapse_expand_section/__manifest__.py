@@ -4,7 +4,7 @@
     'description': "Collapse Expand Section on One2many Field. Show total items under section line.",
     'author': "Sonny Huynh",
     'category': 'Productivity',
-    'version': '19.0.0.1',
+    'version': '1.0.0',
     'depends': ['web', 'account', 'sale'],
 
     'data': [],
