@@ -8,7 +8,7 @@
         'security/ir.model.access.csv', # ¡No olvides la seguridad!
         'views/actualizador_views.xml',
 		'views/actualizador_products_view.xml',
-		'views/actualizador_products_view.xml',
+		'views/clear_product.xml',
 ],
     'installable': True,
     'application': False,
