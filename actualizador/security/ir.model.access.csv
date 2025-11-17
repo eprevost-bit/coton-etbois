@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_contact_updater_wizard,access.contact.updater.wizard,model_contact_updater_wizard,base.group_user,1,1,1,1
 access_product_description_updater_wizard,access.product.description.updater.wizard,model_product_description_updater_wizard,base.group_user,1,1,1,1
+access_product_description_cleaner_wizard,access.product.description.cleaner.wizard,model_product_description_cleaner_wizard,base.group_user,1,1,1,1
