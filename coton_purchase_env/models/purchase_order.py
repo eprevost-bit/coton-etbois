@@ -138,8 +138,12 @@ class PurchaseOrderCustom(models.Model):
                 # Adaptación Odoo 19: El campo qty_to_invoice puede no existir
                 # Si usas la lógica de Odoo 19, deberías basarte en 'qty_billable' o similar.
                 # Por ahora, mantendremos tu lógica original asumiendo que el campo existe.
-                qty_to_invoice = line.qty_to_invoice if hasattr(line,
-                                                                'qty_to_invoice') else line.qty_received - line.qty_invoiced
+                # qty_to_invoice = line.qty_to_invoice if hasattr(line,
+                #                                                 'qty_to_invoice') else line.qty_received - line.qty_invoiced
+                # --- FUERZA BRUTA: Siempre cobrar sobre lo pedido ---
+                # Ignoramos si el producto pide recepción o si existe el campo calculado.
+                # Simplemente: Cantidad Pedida (product_qty) - Cantidad ya Facturada (qty_invoiced)
+                qty_to_invoice = line.product_qty - line.qty_invoiced
 
                 if not float_is_zero(qty_to_invoice, precision_digits=precision):
                     if pending_section:
@@ -154,9 +158,9 @@ class PurchaseOrderCustom(models.Model):
                     sequence += 1
             invoice_vals_list.append(invoice_vals)
 
-        # if not invoice_vals_list:
-        #     raise UserError(
-        #         _('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
+        if not invoice_vals_list:
+            raise UserError(
+                _('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
 
         # 2) group by (company_id, partner_id, currency_id) for batch creation
         #    *** INICIO DE LA CORRECCIÓN ***
