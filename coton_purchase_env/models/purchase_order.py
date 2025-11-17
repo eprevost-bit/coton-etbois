@@ -154,9 +154,9 @@ class PurchaseOrderCustom(models.Model):
                     sequence += 1
             invoice_vals_list.append(invoice_vals)
 
-        if not invoice_vals_list:
-            raise UserError(
-                _('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
+        # if not invoice_vals_list:
+        #     raise UserError(
+        #         _('There is no invoiceable line. If a product has a control policy based on received quantity, please make sure that a quantity has been received.'))
 
         # 2) group by (company_id, partner_id, currency_id) for batch creation
         #    *** INICIO DE LA CORRECCIÓN ***
