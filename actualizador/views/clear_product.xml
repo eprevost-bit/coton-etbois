@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="product_description_cleaner_wizard_form_view" model="ir.ui.view">
+        <field name="name">product.description.cleaner.wizard.form</field>
+        <field name="model">product.description.cleaner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Limpiar Descripciones de Productos">
+                <div class="alert alert-danger" role="alert" style="margin-bottom: 10px;">
+                    <i class="fa fa-exclamation-triangle"/>
+                    <strong> ATENCIÓN:</strong> Esta acción borrará datos permanentemente.
+                </div>
+
+                <group>
+                    <field name="info_text" nolabel="1" readonly="1"/>
+                </group>
+
+                <footer>
+                    <button name="action_clean_descriptions"
+                            type="object"
+                            string="Sí, Eliminar Descripciones"
+                            class="oe_highlight"
+                            confirm="¿Estás completamente seguro? Se borrarán las descripciones de todos los productos encontrados."/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_open_product_description_cleaner_wizard" model="ir.actions.act_window">
+        <field name="name">Limpiar Descripciones (Masivo)</field>
+        <field name="res_model">product.description.cleaner.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_product_description_cleaner_wizard"
+        name="Limpiar Descripciones"
+        parent="sale.product_menu_catalog"
+        action="action_open_product_description_cleaner_wizard"
+        sequence="110"/>
+
+</odoo>
