@@ -120,27 +120,37 @@ class PurchaseOrderCustom(models.Model):
         }
 
     def action_create_invoice(self):
-        """Create the invoice associated to the PO.
-        """
+        """Create the invoice associated to the PO."""
         precision = self.env['decimal.precision'].precision_get('Product Unit of Measure')
 
-        # 1) Prepare invoice vals and clean-up the section lines
         invoice_vals_list = []
         sequence = 10
+
+        _logger.info(f"--- INICIO ACTION_CREATE_INVOICE para {len(self)} ordenes ---")
+
         for order in self:
+            # LOG PARA VER EL ESTADO
+            _logger.info(
+                f"Orden: {order.name}, Estado Facturación: {order.invoice_status}, Estado Orden: {order.state}")
+
             if order.invoice_status != 'to invoice':
+                _logger.warning(f"SALTANDO Orden {order.name} porque su status no es 'to invoice'")
                 continue
 
             order = order.with_company(order.company_id)
             pending_section = None
-            # Invoice values.
             invoice_vals = order._prepare_invoice()
-            # Invoice line values (keep only necessary sections).
+
+            lines_added = 0
             for line in order.order_line:
                 if line.display_type == 'line_section':
                     pending_section = line
                     continue
+
+                # LOG PARA VER CANTIDADES
                 qty_to_invoice = line.product_qty - line.qty_invoiced
+                _logger.info(
+                    f"Line {line.name}: Qty total: {line.product_qty}, Invoiced: {line.qty_invoiced}, To Invoice: {qty_to_invoice}")
 
                 if not float_is_zero(qty_to_invoice, precision_digits=precision):
                     if pending_section:
@@ -153,11 +163,16 @@ class PurchaseOrderCustom(models.Model):
                     line_vals.update({'sequence': sequence})
                     invoice_vals['invoice_line_ids'].append((0, 0, line_vals))
                     sequence += 1
-            if invoice_vals_list:
+                    lines_added += 1
+
+            if lines_added > 0:
                 invoice_vals_list.append(invoice_vals)
             else:
                 _logger.warning(f"Orden {order.name} no agregó líneas a la factura (posiblemente qty_to_invoice es 0)")
 
+        _logger.info(f"Se generarán {len(invoice_vals_list)} facturas.")
+
+        # --- LÓGICA DE AGRUPACIÓN (IGUAL QUE ANTES) ---
         new_invoice_vals_list = []
         for grouping_keys, invoices in groupby(invoice_vals_list,
                                                key=lambda x: (x.get('company_id'), x.get('partner_id'),
@@ -171,26 +186,19 @@ class PurchaseOrderCustom(models.Model):
                     ref_invoice_vals = invoice_vals
                 else:
                     ref_invoice_vals['invoice_line_ids'] += invoice_vals['invoice_line_ids']
-
-                # Usamos .get() para obtener valores de forma segura
-                origins.add(invoice_vals.get('invoice_origin', ''))  # invoice_origin debe existir, pero por seguridad
-
+                origins.add(invoice_vals.get('invoice_origin', ''))
                 payment_ref = invoice_vals.get('payment_reference')
-                if payment_ref:
-                    payment_refs.add(payment_ref)
-
+                if payment_ref: payment_refs.add(payment_ref)
                 ref = invoice_vals.get('ref')
-                if ref:
-                    refs.add(ref)
+                if ref: refs.add(ref)
 
             ref_invoice_vals.update({
-                'ref': ', '.join(filter(None, refs))[:2000],  # Filtramos Nones/strings vacíos
+                'ref': ', '.join(filter(None, refs))[:2000],
                 'invoice_origin': ', '.join(filter(None, origins)),
                 'payment_reference': len(payment_refs) == 1 and payment_refs.pop() or False,
             })
             new_invoice_vals_list.append(ref_invoice_vals)
         invoice_vals_list = new_invoice_vals_list
-        #    *** FIN DE LA CORRECCIÓN ***
 
         # 3) Create invoices.
         moves = self.env['account.move']
@@ -198,9 +206,24 @@ class PurchaseOrderCustom(models.Model):
         for vals in invoice_vals_list:
             moves |= AccountMove.with_company(vals['company_id']).create(vals)
 
-        # 4) Some moves might actually be refunds: convert them if the total amount is negative
+        # 4) Refunds conversion
         moves.filtered(lambda m: m.currency_id.round(m.amount_total) < 0).action_switch_move_type()
 
+        if not moves:
+            _logger.error("NO SE CREARON MOVES. Retornando acción vacía o notificación.")
+            # Opcional: Retornar una notificación al usuario de que no había nada que facturar
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Atención',
+                    'message': 'No hay líneas facturables para las órdenes seleccionadas.',
+                    'sticky': False,
+                    'type': 'warning',
+                }
+            }
+
+        # --- RETORNO MANUAL DE LA ACCIÓN ---
         action = self.env["ir.actions.act_window"]._for_xml_id("account.action_move_in_invoice_type")
         if 'context' not in action:
             action['context'] = {}
