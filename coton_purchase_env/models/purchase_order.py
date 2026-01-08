@@ -1,3 +1,4 @@
+from ast import literal_eval
 from collections import defaultdict
 
 from odoo import models, fields, api, _
