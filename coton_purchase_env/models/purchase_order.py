@@ -3,9 +3,12 @@ from collections import defaultdict
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero, groupby
+import logging
 from itertools import groupby
 from ast import literal_eval
+from odoo.tools import float_is_zero
 
+_logger = logging.getLogger(__name__)
 
 class PurchaseOrderLineCustom(models.Model):
     _inherit = 'purchase.order.line'
@@ -117,7 +120,8 @@ class PurchaseOrderCustom(models.Model):
         }
 
     def action_create_invoice(self):
-        """Create the invoice associated to the PO."""
+        """Create the invoice associated to the PO.
+        """
         precision = self.env['decimal.precision'].precision_get('Product Unit of Measure')
 
         # 1) Prepare invoice vals and clean-up the section lines
@@ -129,8 +133,9 @@ class PurchaseOrderCustom(models.Model):
 
             order = order.with_company(order.company_id)
             pending_section = None
+            # Invoice values.
             invoice_vals = order._prepare_invoice()
-
+            # Invoice line values (keep only necessary sections).
             for line in order.order_line:
                 if line.display_type == 'line_section':
                     pending_section = line
@@ -148,9 +153,11 @@ class PurchaseOrderCustom(models.Model):
                     line_vals.update({'sequence': sequence})
                     invoice_vals['invoice_line_ids'].append((0, 0, line_vals))
                     sequence += 1
-            invoice_vals_list.append(invoice_vals)
+            if invoice_vals_list:
+                invoice_vals_list.append(invoice_vals)
+            else:
+                _logger.warning(f"Orden {order.name} no agregó líneas a la factura (posiblemente qty_to_invoice es 0)")
 
-        # Agrupación de facturas (Tu lógica personalizada)
         new_invoice_vals_list = []
         for grouping_keys, invoices in groupby(invoice_vals_list,
                                                key=lambda x: (x.get('company_id'), x.get('partner_id'),
@@ -165,7 +172,8 @@ class PurchaseOrderCustom(models.Model):
                 else:
                     ref_invoice_vals['invoice_line_ids'] += invoice_vals['invoice_line_ids']
 
-                origins.add(invoice_vals.get('invoice_origin', ''))
+                # Usamos .get() para obtener valores de forma segura
+                origins.add(invoice_vals.get('invoice_origin', ''))  # invoice_origin debe existir, pero por seguridad
 
                 payment_ref = invoice_vals.get('payment_reference')
                 if payment_ref:
@@ -176,12 +184,13 @@ class PurchaseOrderCustom(models.Model):
                     refs.add(ref)
 
             ref_invoice_vals.update({
-                'ref': ', '.join(filter(None, refs))[:2000],
+                'ref': ', '.join(filter(None, refs))[:2000],  # Filtramos Nones/strings vacíos
                 'invoice_origin': ', '.join(filter(None, origins)),
                 'payment_reference': len(payment_refs) == 1 and payment_refs.pop() or False,
             })
             new_invoice_vals_list.append(ref_invoice_vals)
         invoice_vals_list = new_invoice_vals_list
+        #    *** FIN DE LA CORRECCIÓN ***
 
         # 3) Create invoices.
         moves = self.env['account.move']
@@ -189,30 +198,21 @@ class PurchaseOrderCustom(models.Model):
         for vals in invoice_vals_list:
             moves |= AccountMove.with_company(vals['company_id']).create(vals)
 
-        # 4) Convert negative totals to refunds
+        # 4) Some moves might actually be refunds: convert them if the total amount is negative
         moves.filtered(lambda m: m.currency_id.round(m.amount_total) < 0).action_switch_move_type()
 
-        # --- CORRECCIÓN DEL ERROR ODOO 19 ---
-        # En lugar de llamar a self.action_view_invoice(moves), construimos la acción manualmente
-        # para evitar el KeyError: 'context' del código base inestable.
-
         action = self.env["ir.actions.act_window"]._for_xml_id("account.action_move_in_invoice_type")
-
-        # 1. Manejo seguro del 'context' (Aquí es donde fallaba Odoo)
         if 'context' not in action:
             action['context'] = {}
         elif isinstance(action['context'], str):
-            # Si viene como string, intentamos evaluarlo, si falla lo dejamos vacío
             try:
                 action['context'] = literal_eval(action['context'])
             except:
                 action['context'] = {}
 
-        # 2. Definir qué facturas mostrar
         if len(moves) > 1:
             action['domain'] = [('id', 'in', moves.ids)]
         elif len(moves) == 1:
-            # Si es solo una, redirigimos directamente a la vista formulario
             form_view = [(self.env.ref('account.view_move_form').id, 'form')]
             if 'views' in action:
                 action['views'] = form_view + [(state, view) for state, view in action['views'] if view != 'form']
@@ -220,7 +220,6 @@ class PurchaseOrderCustom(models.Model):
                 action['views'] = form_view
             action['res_id'] = moves.id
 
-        # 3. Inyectar contexto necesario
         action['context'].update({
             'default_move_type': 'in_invoice',
             'create': False,
