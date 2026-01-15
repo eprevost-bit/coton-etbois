@@ -7,6 +7,9 @@ import logging
 from itertools import groupby
 from ast import literal_eval
 from odoo.tools import float_is_zero
+import base64
+import io
+import xlsxwriter
 
 _logger = logging.getLogger(__name__)
 
@@ -90,34 +93,133 @@ class PurchaseOrderCustom(models.Model):
         
         return True
 
+    def _generate_excel_attachment(self, selected_lines):
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        sheet = workbook.add_worksheet('Partidas')
+
+        # Estilos
+        bold = workbook.add_format({'bold': True, 'bg_color': '#f2f2f2', 'border': 1})
+        border = workbook.add_format({'border': 1})
+        currency_style = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+
+        # Cabeceras
+        headers = ['Producto', 'Descripción', 'Cantidad', 'UdM', 'Precio Estimado (Subtotal)']
+        for col_num, header in enumerate(headers):
+            sheet.write(0, col_num, header, bold)
+            sheet.set_column(col_num, col_num, 20)  # Ajustar ancho
+
+        # Datos
+        row = 1
+        for line in selected_lines:
+            sheet.write(row, 0, line.product_id.name, border)
+            sheet.write(row, 1, line.name, border)
+            sheet.write(row, 2, line.product_qty, border)
+            sheet.write(row, 3, line.product_uom_id.name or '', border)
+            sheet.write(row, 4, line.price_subtotal, currency_style)
+            row += 1
+
+        workbook.close()
+        output.seek(0)
+        file_content = base64.b64encode(output.read())
+        output.close()
+
+        # Crear el adjunto en Odoo
+        attachment = self.env['ir.attachment'].create({
+            'name': f'Solicitud_{self.name}.xlsx',
+            'type': 'binary',
+            'datas': file_content,
+            'res_model': 'purchase.order',
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        return attachment.id
+
     def action_send_items_by_email(self):
         self.ensure_one()
-
-        # 2. Filtrar para obtener solo las líneas que el usuario seleccionó
         selected_lines = self.order_line.filtered(lambda line: line.is_selected_for_email)
 
         if not selected_lines:
-            raise UserError("Por favor, seleccione al menos una partida para enviar por correo electrónico.")
+            raise UserError("Por favor, seleccione al menos una partida.")
 
-        # 3. Cargar la plantilla de correo que crearemos en el siguiente paso
+        # Generar Excel
+        attachment_id = self._generate_excel_attachment(selected_lines)
+
+        # Usar plantilla ORIGINAL
         template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines')
 
-        # 4. Abrir el pop-up del correo electrónico (compositor de correo)
         return {
             'type': 'ir.actions.act_window',
             'view_mode': 'form',
             'res_model': 'mail.compose.message',
             'views': [(False, 'form')],
-            'view_id': False,
             'target': 'new',
             'context': {
                 'default_model': 'purchase.order',
                 'default_res_ids': [self.id],
                 'default_use_template': True,
                 'default_template_id': template.id,
+                'default_attachment_ids': [(6, 0, [attachment_id])],  # Aquí adjuntamos el Excel
                 'selected_line_ids': selected_lines.ids
             },
         }
+
+    def action_send_items_with_price(self):
+        self.ensure_one()
+        selected_lines = self.order_line.filtered(lambda line: line.is_selected_for_email)
+
+        if not selected_lines:
+            raise UserError("Por favor, seleccione al menos una partida.")
+
+        # Generar Excel (El mismo excel para ambos casos)
+        attachment_id = self._generate_excel_attachment(selected_lines)
+
+        # Usar la NUEVA plantilla (definida abajo en XML)
+        template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines_price')
+
+        return {
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'mail.compose.message',
+            'views': [(False, 'form')],
+            'target': 'new',
+            'context': {
+                'default_model': 'purchase.order',
+                'default_res_ids': [self.id],
+                'default_use_template': True,
+                'default_template_id': template.id,
+                'default_attachment_ids': [(6, 0, [attachment_id])],  # Adjuntamos Excel
+                'selected_line_ids': selected_lines.ids
+            },
+        }
+    # def action_send_items_by_email(self):
+    #     self.ensure_one()
+    #
+    #     # 2. Filtrar para obtener solo las líneas que el usuario seleccionó
+    #     selected_lines = self.order_line.filtered(lambda line: line.is_selected_for_email)
+    #
+    #     if not selected_lines:
+    #         raise UserError("Por favor, seleccione al menos una partida para enviar por correo electrónico.")
+    #
+    #     # 3. Cargar la plantilla de correo que crearemos en el siguiente paso
+    #     template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines')
+    #
+    #     # 4. Abrir el pop-up del correo electrónico (compositor de correo)
+    #     return {
+    #         'type': 'ir.actions.act_window',
+    #         'view_mode': 'form',
+    #         'res_model': 'mail.compose.message',
+    #         'views': [(False, 'form')],
+    #         'view_id': False,
+    #         'target': 'new',
+    #         'context': {
+    #             'default_model': 'purchase.order',
+    #             'default_res_ids': [self.id],
+    #             'default_use_template': True,
+    #             'default_template_id': template.id,
+    #             'selected_line_ids': selected_lines.ids
+    #         },
+    #     }
 
     def action_create_invoice(self):
         """Create the invoice associated to the PO."""

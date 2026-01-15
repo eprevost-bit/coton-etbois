@@ -22,12 +22,17 @@
                             string="Enviar Partidas por Correo"
                             class="oe_highlight"
                     />
+                    <button name="action_send_items_with_price"
+                            type="object"
+                            string="Enviar Partidas (UdM y Coste)"
+                            class="btn-secondary"
+                            states="draft,sent,purchase"/>
 
                 </xpath>
 
-<!--                <xpath expr="//field[@name='order_line']/tree/field[@name='name']" position="before">-->
-<!--                    <field name="is_selected_for_email" nolabel="1"/>-->
-<!--                </xpath>-->
+                <!--                <xpath expr="//field[@name='order_line']/tree/field[@name='name']" position="before">-->
+                <!--                    <field name="is_selected_for_email" nolabel="1"/>-->
+                <!--                </xpath>-->
 
             </field>
         </record>

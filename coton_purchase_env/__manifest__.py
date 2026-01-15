@@ -8,6 +8,7 @@
     'data': [
         'views/purchase_order_views.xml',
         'data/mail_template_data.xml',
+        'data/email_template_purchase_selected_lines_price.xml',
 		'views/purchase_order_line.xml',
 ],
     'installable': True,
