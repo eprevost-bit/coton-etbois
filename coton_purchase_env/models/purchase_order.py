@@ -141,57 +141,71 @@ class PurchaseOrderCustom(models.Model):
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         sheet = workbook.add_worksheet('Import_Export')
 
-        # Formatos
+        # Estilos
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#d9d9d9', 'border': 1})
         date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
-        # 1. Definir columnas: ¡LA SEGUNDA COLUMNA ES LA CLAVE!
+        # ------------------------------------------------------------------
+        # 1. COLUMNAS EXACTAS (Replicando "Quiero actualizar datos")
+        # ------------------------------------------------------------------
         headers = [
-            'id',
-            'order_line/id',
-            'name',
-            'partner_id',
-            'date_order',
-            'order_line/product_id',
-            'order_line/name',
-            'order_line/product_qty',
-            'order_line/price_unit',
+            'id',  # A: ID Externo del PEDIDO (Para encontrar P00046)
+            'order_line/id',  # B: ID Externo de la LÍNEA (¡EL TRUCO! Para actualizar en vez de crear)
+            'name',  # Referencia
+            'partner_id',  # Proveedor
+            'date_order',  # Fecha
+            'order_line/product_id',  # Producto
+            'order_line/name',  # Descripción
+            'order_line/product_qty',  # Cantidad
+            'order_line/price_unit',  # Precio Unitario
         ]
 
-        # Escribir Cabeceras
+        # Escribir cabeceras
         for col_num, header in enumerate(headers):
             sheet.write(0, col_num, header, header_fmt)
             sheet.set_column(col_num, col_num, 25)
 
-        # 2. Obtener ID del Pedido (Cabecera)
-        # Si no tiene ID externo, creamos uno estable usando "__export__"
+        # ------------------------------------------------------------------
+        # 2. OBTENER ID DEL PEDIDO (CABECERA)
+        # ------------------------------------------------------------------
+        # Intentamos obtener el ID externo real. Si no tiene, creamos uno estable.
         external_ids = self.get_external_id()
-        xml_id = external_ids.get(self.id) or f"__export__.purchase_order_{self.id}"
+        po_xml_id = external_ids.get(self.id)
+        if not po_xml_id:
+            # Si se creó a mano no tiene XML_ID, así que inventamos uno que SIEMPRE sea el mismo para este ID
+            po_xml_id = f"__export__.purchase_order_{self.id}"
 
-        # Datos comunes
+        # Datos estáticos de cabecera
         po_name = self.name
         po_partner = self.partner_id.name
         po_date = self.date_order
 
-        # 3. Escribir las líneas
+        # ------------------------------------------------------------------
+        # 3. RECORRER LÍNEAS (Aquí está la magia de la actualización)
+        # ------------------------------------------------------------------
         row = 1
         for line in selected_lines:
-            # --- GENERACIÓN DEL ID DE LÍNEA ---
-            # Buscamos si la línea ya tiene un ID externo real
-            line_ext_ids = line.get_external_id()
-            # Si no tiene, inventamos uno FIJO usando su ID de base de datos.
-            # Al ser fijo, Odoo sabrá que es la misma línea al importar.
-            line_xml_id = line_ext_ids.get(line.id) or f"__export__.purchase_order_line_{line.id}"
-            # ----------------------------------
 
-            # Escribir datos
-            sheet.write(row, 0, xml_id)  # Col A: ID del Pedido
-            sheet.write(row, 1, line_xml_id)  # Col B: ID de la Línea (IMPORTANTE)
+            # --- OBTENER ID DE LA LÍNEA ---
+            # Esto es lo que hace la casilla "Quiero actualizar datos" internamente
+            line_ext_ids = line.get_external_id()
+            line_xml_id = line_ext_ids.get(line.id)
+
+            if not line_xml_id:
+                # Si la línea no tiene ID externo, generamos uno ESTABLE basado en su ID de base de datos.
+                # Al ser estable, Odoo sabrá mañana que "__export__.line_99" es la línea 99 y la actualizará.
+                line_xml_id = f"__export__.purchase_order_line_{line.id}"
+
+            # ------------------------------
+
+            # Escribir fila
+            sheet.write(row, 0, po_xml_id)  # Col A: ID Pedido
+            sheet.write(row, 1, line_xml_id)  # Col B: ID Línea (Vital para no duplicar)
             sheet.write(row, 2, po_name)
             sheet.write(row, 3, po_partner)
             sheet.write_datetime(row, 4, po_date, date_fmt)
 
-            # Datos de la línea
+            # Datos a editar
             sheet.write(row, 5, line.product_id.display_name or '')
             sheet.write(row, 6, line.name)
             sheet.write(row, 7, line.product_qty)
