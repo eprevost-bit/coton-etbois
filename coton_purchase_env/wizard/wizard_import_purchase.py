@@ -25,97 +25,115 @@ class PurchaseImportWizard(models.TransientModel):
         if not openpyxl:
             raise UserError("La librería openpyxl no está instalada.")
 
+        # 1. Leer el archivo Excel
         try:
             file_content = base64.b64decode(self.file_data)
             data = io.BytesIO(file_content)
             workbook = openpyxl.load_workbook(data, data_only=True)
             sheet = workbook.active
         except Exception as e:
-            raise UserError(f"No se pudo leer el archivo Excel. Error: {e}")
+            raise UserError(f"Error al leer el archivo: {e}")
 
+        # ---------------------------------------------------------
+        # 2. MAPEO DINÁMICO DE COLUMNAS (¡LA SOLUCIÓN!)
+        # ---------------------------------------------------------
+        # Leemos la primera fila (Cabeceras) para saber dónde está cada cosa
+        header_iterator = sheet.iter_rows(min_row=1, max_row=1, values_only=True)
+        try:
+            headers = next(header_iterator)  # Obtenemos la lista de nombres ['id', 'name', ...]
+        except StopIteration:
+            raise UserError("El archivo Excel parece estar vacío.")
+        col_map = {str(h).strip(): i for i, h in enumerate(headers) if h}
+
+        _logger.info(f"DEBUG - Columnas encontradas: {col_map}")
+
+        # Verificamos que exista la columna OBLIGATORIA
+        if 'order_line/id' not in col_map:
+            raise UserError(
+                f"No se encuentra la columna 'order_line/id' en el Excel.\n"
+                f"Columnas detectadas: {list(col_map.keys())}"
+            )
+
+        # Obtenemos los índices (números de columna)
+        idx_xml_id = col_map['order_line/id']
+        # Usamos .get() por si acaso no existen, que devuelva None
+        idx_price = col_map.get('order_line/price_unit')
+        idx_qty = col_map.get('order_line/product_qty')
+
+        # ---------------------------------------------------------
+        # 3. RECORRER Y ACTUALIZAR
+        # ---------------------------------------------------------
         updated_count = 0
         skipped_count = 0
 
-        # LOG: Para ver qué está pasando en la consola del servidor
-        _logger.info(">>> INICIANDO IMPORTACIÓN DE LÍNEAS DE COMPRA <<<")
+        # Empezamos en la fila 2 (datos)
+        for i, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
 
-        # Recorremos filas. start=2 es solo para el log (fila visual de excel)
-        for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            # Obtener el ID usando el índice dinámico
+            line_xml_id = row[idx_xml_id]
 
-            # --- MAPEO DE COLUMNAS (Asegúrate que coincida con tu exportación) ---
-            # Col B (Indice 1): order_line/id
-            # Col H (Indice 7): order_line/product_qty
-            # Col I (Indice 8): order_line/price_unit
-
-            line_xml_id = row[1]
-            qty_raw = row[7]
-            price_raw = row[8]
-
-            # 1. Limpieza del ID
             if not line_xml_id:
-                _logger.info(f"Fila {idx}: Saltada (No hay ID externo)")
+                _logger.info(f"Fila {i}: Saltada (ID vacío)")
                 skipped_count += 1
                 continue
 
-            # Asegurar que el ID es texto y quitar espacios sobrantes
+            # Limpiar el ID (quitar espacios)
             line_xml_id = str(line_xml_id).strip()
 
-            # 2. Buscar la línea en Odoo
-            try:
-                line_record = self.env.ref(line_xml_id, raise_if_not_found=False)
-            except ValueError:
-                line_record = None
+            # Buscar en Odoo
+            line_record = self.env.ref(line_xml_id, raise_if_not_found=False)
 
             if not line_record:
-                _logger.warning(f"Fila {idx}: ID '{line_xml_id}' no encontrado en Odoo.")
+                # Intento extra: A veces el ID viene sin el módulo "__export__"
+                # Si el usuario subió un ID manual, esto ayuda a depurar
+                _logger.warning(f"Fila {i}: ID '{line_xml_id}' NO ENCONTRADO en base de datos.")
                 skipped_count += 1
                 continue
 
-            # Verificar que sea realmente una línea de compra
             if line_record._name != 'purchase.order.line':
-                _logger.warning(f"Fila {idx}: El ID '{line_xml_id}' no es una línea de compra.")
+                _logger.warning(f"Fila {i}: El ID corresponde a '{line_record._name}', no a una línea de compra.")
                 skipped_count += 1
                 continue
 
-            # 3. Preparar valores (CORRECCIÓN PRINCIPAL AQUÍ)
+            # Preparar valores
             vals = {}
 
-            # --- Procesar PRECIO ---
-            if price_raw is not None:
-                try:
-                    # Intentamos convertir a float, sea texto o número
-                    vals['price_unit'] = float(price_raw)
-                except (ValueError, TypeError):
-                    _logger.warning(f"Fila {idx}: El precio '{price_raw}' no es un número válido.")
+            # -- PRECIO --
+            if idx_price is not None:
+                raw_price = row[idx_price]
+                if raw_price is not None:
+                    try:
+                        vals['price_unit'] = float(raw_price)
+                    except ValueError:
+                        pass  # No era un número
 
-            # --- Procesar CANTIDAD ---
-            if qty_raw is not None:
-                try:
-                    vals['product_qty'] = float(qty_raw)
-                except (ValueError, TypeError):
-                    pass  # Si falla la cantidad, ignoramos pero seguimos con el precio
+            # -- CANTIDAD --
+            if idx_qty is not None:
+                raw_qty = row[idx_qty]
+                if raw_qty is not None:
+                    try:
+                        vals['product_qty'] = float(raw_qty)
+                    except ValueError:
+                        pass
 
-            # 4. Escribir cambios
+            # Escribir
             if vals:
-                try:
-                    line_record.write(vals)
-                    updated_count += 1
-                    _logger.info(f"Fila {idx}: Actualizada OK. ID: {line_xml_id} -> {vals}")
-                except Exception as e:
-                    _logger.error(f"Fila {idx}: Error al escribir en Odoo: {e}")
-                    skipped_count += 1
+                line_record.write(vals)
+                updated_count += 1
+                _logger.info(f"Fila {i}: Actualizada OK ({line_xml_id}) -> {vals}")
             else:
-                _logger.info(f"Fila {idx}: Saltada (Sin cambios válidos)")
                 skipped_count += 1
+                _logger.info(f"Fila {i}: Sin cambios detectados o datos vacíos.")
 
-        _logger.info(f">>> FIN IMPORTACIÓN: Actualizados {updated_count}, Omitidos {skipped_count} <<<")
-
+        # ---------------------------------------------------------
+        # 4. RESULTADO
+        # ---------------------------------------------------------
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Importación Completada'),
-                'message': f'Se actualizaron {updated_count} líneas. Se omitieron {skipped_count}. Revisar logs si hay errores.',
+                'title': _('Proceso Terminado'),
+                'message': f'✅ Actualizadas: {updated_count}\n❌ Omitidas/No encontradas: {skipped_count}',
                 'type': 'success' if updated_count > 0 else 'warning',
                 'sticky': False,
                 'next': {'type': 'ir.actions.act_window_close'},
