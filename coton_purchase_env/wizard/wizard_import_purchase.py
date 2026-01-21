@@ -1,9 +1,11 @@
 import base64
 import io
+import logging
 from odoo import models, fields, _, api
 from odoo.exceptions import UserError
 
-# Intentamos importar openpyxl (Estándar en Odoo moderno)
+_logger = logging.getLogger(__name__)
+
 try:
     import openpyxl
 except ImportError:
@@ -19,15 +21,10 @@ class PurchaseImportWizard(models.TransientModel):
     purchase_id = fields.Many2one('purchase.order', string='Pedido de Compra')
 
     def action_import_lines(self):
-        """
-        Lee el Excel, busca las líneas por ID Externo y actualiza precios/cantidades.
-        NO crea líneas nuevas.
-        """
         self.ensure_one()
         if not openpyxl:
             raise UserError("La librería openpyxl no está instalada.")
 
-        # 1. Decodificar el archivo binario
         try:
             file_content = base64.b64decode(self.file_data)
             data = io.BytesIO(file_content)
@@ -36,63 +33,90 @@ class PurchaseImportWizard(models.TransientModel):
         except Exception as e:
             raise UserError(f"No se pudo leer el archivo Excel. Error: {e}")
 
-        # 2. Recorrer filas (Saltando la cabecera)
-        # Basado en TU estructura de exportación:
-        # Col 0 (A): id (Pedido)
-        # Col 1 (B): order_line/id (CLAVE)
-        # ...
-        # Col 7 (H): order_line/product_qty
-        # Col 8 (I): order_line/price_unit
-
         updated_count = 0
         skipped_count = 0
 
-        # iter_rows empieza en 1. min_row=2 salta la cabecera.
-        for row in sheet.iter_rows(min_row=2, values_only=True):
+        # LOG: Para ver qué está pasando en la consola del servidor
+        _logger.info(">>> INICIANDO IMPORTACIÓN DE LÍNEAS DE COMPRA <<<")
 
-            # Obtenemos los datos por índice (0, 1, 2...)
-            line_xml_id = row[1]  # Columna B: ID Externo de la línea
-            qty = row[7]  # Columna H: Cantidad
-            price = row[8]  # Columna I: Precio
+        # Recorremos filas. start=2 es solo para el log (fila visual de excel)
+        for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
 
+            # --- MAPEO DE COLUMNAS (Asegúrate que coincida con tu exportación) ---
+            # Col B (Indice 1): order_line/id
+            # Col H (Indice 7): order_line/product_qty
+            # Col I (Indice 8): order_line/price_unit
+
+            line_xml_id = row[1]
+            qty_raw = row[7]
+            price_raw = row[8]
+
+            # 1. Limpieza del ID
             if not line_xml_id:
+                _logger.info(f"Fila {idx}: Saltada (No hay ID externo)")
                 skipped_count += 1
                 continue
 
-            # 3. BUSCAR LA LÍNEA POR ID EXTERNO (La magia para no duplicar)
+            # Asegurar que el ID es texto y quitar espacios sobrantes
+            line_xml_id = str(line_xml_id).strip()
+
+            # 2. Buscar la línea en Odoo
             try:
-                # self.env.ref convierte "__export__.line_123" en el objeto real de la BD
                 line_record = self.env.ref(line_xml_id, raise_if_not_found=False)
             except ValueError:
-                # A veces el XML ID viene sucio o mal formado
                 line_record = None
 
-            if line_record and line_record._name == 'purchase.order.line':
-                # 4. ACTUALIZAR (WRITE)
-                # Solo actualizamos si encontramos la línea. Así garantizamos 0 duplicados.
-                vals = {}
+            if not line_record:
+                _logger.warning(f"Fila {idx}: ID '{line_xml_id}' no encontrado en Odoo.")
+                skipped_count += 1
+                continue
 
-                # Validamos que sean números para no romper Odoo
-                if isinstance(price, (int, float)):
-                    vals['price_unit'] = price
+            # Verificar que sea realmente una línea de compra
+            if line_record._name != 'purchase.order.line':
+                _logger.warning(f"Fila {idx}: El ID '{line_xml_id}' no es una línea de compra.")
+                skipped_count += 1
+                continue
 
-                if isinstance(qty, (int, float)):
-                    vals['product_qty'] = qty
+            # 3. Preparar valores (CORRECCIÓN PRINCIPAL AQUÍ)
+            vals = {}
 
-                if vals:
+            # --- Procesar PRECIO ---
+            if price_raw is not None:
+                try:
+                    # Intentamos convertir a float, sea texto o número
+                    vals['price_unit'] = float(price_raw)
+                except (ValueError, TypeError):
+                    _logger.warning(f"Fila {idx}: El precio '{price_raw}' no es un número válido.")
+
+            # --- Procesar CANTIDAD ---
+            if qty_raw is not None:
+                try:
+                    vals['product_qty'] = float(qty_raw)
+                except (ValueError, TypeError):
+                    pass  # Si falla la cantidad, ignoramos pero seguimos con el precio
+
+            # 4. Escribir cambios
+            if vals:
+                try:
                     line_record.write(vals)
                     updated_count += 1
+                    _logger.info(f"Fila {idx}: Actualizada OK. ID: {line_xml_id} -> {vals}")
+                except Exception as e:
+                    _logger.error(f"Fila {idx}: Error al escribir en Odoo: {e}")
+                    skipped_count += 1
             else:
+                _logger.info(f"Fila {idx}: Saltada (Sin cambios válidos)")
                 skipped_count += 1
 
-        # 5. Notificar al usuario
+        _logger.info(f">>> FIN IMPORTACIÓN: Actualizados {updated_count}, Omitidos {skipped_count} <<<")
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Importación Completada'),
-                'message': f'Se actualizaron {updated_count} líneas. Se omitieron {skipped_count}.',
-                'type': 'success',
+                'message': f'Se actualizaron {updated_count} líneas. Se omitieron {skipped_count}. Revisar logs si hay errores.',
+                'type': 'success' if updated_count > 0 else 'warning',
                 'sticky': False,
                 'next': {'type': 'ir.actions.act_window_close'},
             }
