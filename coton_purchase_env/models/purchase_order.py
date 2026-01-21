@@ -39,6 +39,17 @@ class PurchaseOrderCustom(models.Model):
 
     number = fields.Float(string="numero de acciones")
 
+    def action_open_import_wizard(self):
+        self.ensure_one()
+        return {
+            'name': _('Importar Líneas desde Excel'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.import.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_purchase_id': self.id},
+        }
+
     def action_set_to_inicial_presupuesto(self):
         all_new_orders = []
         for order in self:
@@ -146,68 +157,70 @@ class PurchaseOrderCustom(models.Model):
         date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
         # ------------------------------------------------------------------
-        # 1. CABECERAS EXACTAS PARA ACTUALIZACIÓN
+        # 1. COLUMNAS EXACTAS (Replicando "Quiero actualizar datos")
         # ------------------------------------------------------------------
-        # Usamos 'order_line/id' en lugar de 'order_line'.
-        # Esto le dice a Odoo: "Aquí va el identificador único de la línea".
         headers = [
-            'id',  # ID del Pedido (P00046)
-            'priority',
-            'name',
-            'partner_id',
-            'date_order',
-            'order_line/id',  # <--- LA CLAVE: El ID Único de la línea
-            'order_line/price_unit',  # El dato a actualizar
-            'order_line/product_qty',  # (Opcional) Cantidad
-            'order_line/name',  # (Opcional) Descripción para que te guíes
+            'id',  # A: ID Externo del PEDIDO (Para encontrar P00046)
+            'order_line/id',  # B: ID Externo de la LÍNEA (¡EL TRUCO! Para actualizar en vez de crear)
+            'name',  # Referencia
+            'partner_id',  # Proveedor
+            'date_order',  # Fecha
+            'order_line/product_id',  # Producto
+            'order_line/name',  # Descripción
+            'order_line/product_qty',  # Cantidad
+            'order_line/price_unit',  # Precio Unitario
         ]
 
         # Escribir cabeceras
         for col_num, header in enumerate(headers):
             sheet.write(0, col_num, header, header_fmt)
-            # Damos espacio extra a las columnas de ID
-            width = 35 if '/id' in header or header == 'id' else 20
-            sheet.set_column(col_num, col_num, width)
+            sheet.set_column(col_num, col_num, 25)
 
         # ------------------------------------------------------------------
-        # 2. DATOS DEL PEDIDO (CABECERA)
+        # 2. OBTENER ID DEL PEDIDO (CABECERA)
         # ------------------------------------------------------------------
+        # Intentamos obtener el ID externo real. Si no tiene, creamos uno estable.
         external_ids = self.get_external_id()
-        po_xml_id = external_ids.get(self.id) or f"__export__.purchase_order_{self.id}"
+        po_xml_id = external_ids.get(self.id)
+        if not po_xml_id:
+            # Si se creó a mano no tiene XML_ID, así que inventamos uno que SIEMPRE sea el mismo para este ID
+            po_xml_id = f"__export__.purchase_order_{self.id}"
 
-        po_priority = str(self.priority) if self.priority else ''
+        # Datos estáticos de cabecera
         po_name = self.name
         po_partner = self.partner_id.name
         po_date = self.date_order
 
         # ------------------------------------------------------------------
-        # 3. RECORRER LÍNEAS (GENERANDO IDs DE LÍNEA)
+        # 3. RECORRER LÍNEAS (Aquí está la magia de la actualización)
         # ------------------------------------------------------------------
         row = 1
         for line in selected_lines:
 
-            # --- OBTENER EL ID EXTERNO DE LA LÍNEA ---
-            # Esto es lo que soluciona tu problema. No usamos el nombre.
-            # Usamos el código único (ej: __export__.line_432)
+            # --- OBTENER ID DE LA LÍNEA ---
+            # Esto es lo que hace la casilla "Quiero actualizar datos" internamente
             line_ext_ids = line.get_external_id()
             line_xml_id = line_ext_ids.get(line.id)
 
             if not line_xml_id:
-                # Si no existe, lo creamos estable
+                # Si la línea no tiene ID externo, generamos uno ESTABLE basado en su ID de base de datos.
+                # Al ser estable, Odoo sabrá mañana que "__export__.line_99" es la línea 99 y la actualizará.
                 line_xml_id = f"__export__.purchase_order_line_{line.id}"
-            # -----------------------------------------
+
+            # ------------------------------
 
             # Escribir fila
-            sheet.write(row, 0, po_xml_id)  # id (Pedido)
-            sheet.write(row, 1, po_priority)
+            sheet.write(row, 0, po_xml_id)  # Col A: ID Pedido
+            sheet.write(row, 1, line_xml_id)  # Col B: ID Línea (Vital para no duplicar)
             sheet.write(row, 2, po_name)
             sheet.write(row, 3, po_partner)
             sheet.write_datetime(row, 4, po_date, date_fmt)
 
-            sheet.write(row, 5, line_xml_id)  # order_line/id (AQUÍ VA EL ID, NO EL NOMBRE)
-            sheet.write(row, 6, line.price_unit)  # order_line/price_unit
+            # Datos a editar
+            sheet.write(row, 5, line.product_id.display_name or '')
+            sheet.write(row, 6, line.name)
             sheet.write(row, 7, line.product_qty)
-            sheet.write(row, 8, line.name)  # Descripción (solo informativo)
+            sheet.write(row, 8, line.price_unit)
 
             row += 1
 
@@ -216,8 +229,9 @@ class PurchaseOrderCustom(models.Model):
         file_content = base64.b64encode(output.read())
         output.close()
 
+        # Crear adjunto
         attachment = self.env['ir.attachment'].create({
-            'name': f'Actualizar_Precios_{self.name}.xlsx',
+            'name': f'Exportacion_Sistema_{self.name}.xlsx',
             'type': 'binary',
             'datas': file_content,
             'res_model': 'purchase.order',

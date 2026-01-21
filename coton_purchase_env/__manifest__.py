@@ -10,6 +10,7 @@
         'data/mail_template_data.xml',
         'data/email_template_purchase_selected_lines_price.xml',
 		'views/purchase_order_line.xml',
+		'wizard/wizard_import_purchase.xml',
 ],
     'installable': True,
     'application': False,
