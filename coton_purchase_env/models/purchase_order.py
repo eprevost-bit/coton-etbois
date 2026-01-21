@@ -214,7 +214,7 @@ class PurchaseOrderCustom(models.Model):
 
         # Crear el adjunto
         attachment = self.env['ir.attachment'].create({
-            'name': f'Exportacion_Sistema_{self.name}.xlsx',  # Nombre diferente
+            'name': f'Exportacion_Pedido_de_Compra_{self.name}.xlsx',  # Nombre diferente
             'type': 'binary',
             'datas': file_content,
             'res_model': 'purchase.order',
