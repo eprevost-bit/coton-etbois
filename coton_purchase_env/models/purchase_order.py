@@ -145,65 +145,69 @@ class PurchaseOrderCustom(models.Model):
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#d9d9d9', 'border': 1})
         date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
-        # 1. Definir las columnas exactas para importar
-        # Nota: Para order_line, necesitamos product_id y name además del precio para que la importación tenga sentido
+        # 1. Definir columnas (AÑADIMOS 'order_line/id')
         headers = [
-            'id',  # ID Externo
-            'priority',  # Prioridad
-            'name',  # Referencia del pedido
-            'partner_id',  # Proveedor
-            'project_id',  # Proyecto (si tienes el módulo analítico/proyectos)
-            'user_id',  # Responsable
-            'date_order',  # Fecha del pedido
-            'activity_ids',  # Actividades (Resumen)
-            'order_line/product_id',  # Producto (Línea)
-            'order_line/name',  # Descripción (Línea)
-            'order_line/product_qty',  # Cantidad
-            'order_line/product_uom',  # UdM
-            'order_line/price_unit',  # Precio Unitario
+            'id',  # ID Externo del PEDIDO (Cabecera)
+            'order_line/id',  # <--- NUEVO: ID Externo de la LÍNEA (Vital para actualizar)
+            'priority',
+            'name',
+            'partner_id',
+            'project_id',
+            'user_id',
+            'date_order',
+            'activity_ids',
+            'order_line/product_id',
+            'order_line/name',
+            'order_line/product_qty',
+            'order_line/product_uom',
+            'order_line/price_unit',
         ]
 
         # Escribir Cabeceras
         for col_num, header in enumerate(headers):
             sheet.write(0, col_num, header, header_fmt)
-            sheet.set_column(col_num, col_num, 20)
+            sheet.set_column(col_num, col_num, 25)  # Un poco más ancho para leer IDs
 
-        # 2. Obtener datos de cabecera del Pedido
-        # Intentamos obtener el ID Externo, si no existe, usamos __export__.purchase_order_[id]
+        # 2. Obtener ID del Pedido (Cabecera)
         external_ids = self.get_external_id()
         xml_id = external_ids.get(self.id) or f"__export__.purchase_order_{self.id}_{self.name.replace('/', '_')}"
 
-        # Datos comunes del pedido (Header)
+        # Datos comunes del pedido
         po_priority = self.priority
         po_name = self.name
         po_partner = self.partner_id.name
-        # Manejo de error por si no tienes el campo project_id instalado
         po_project = self.project_id.name if hasattr(self, 'project_id') and self.project_id else ''
         po_user = self.user_id.name
         po_date = self.date_order
-
-        # Las actividades son many2many/one2many, las concatenamos
         activities = ', '.join([a.summary or a.activity_type_id.name for a in self.activity_ids])
 
-        # 3. Escribir las líneas (Una fila por cada línea seleccionada)
+        # 3. Escribir las líneas
         row = 1
         for line in selected_lines:
-            # Escribimos los datos de cabecera en CADA fila (necesario para importación en Odoo)
-            sheet.write(row, 0, xml_id)
-            sheet.write(row, 1, po_priority)
-            sheet.write(row, 2, po_name)
-            sheet.write(row, 3, po_partner)
-            sheet.write(row, 4, po_project)
-            sheet.write(row, 5, po_user)
-            sheet.write_datetime(row, 6, po_date, date_fmt)
-            sheet.write(row, 7, activities)
+            # --- LÓGICA NUEVA PARA ID DE LÍNEA ---
+            # Obtenemos el ID externo de la línea específica
+            line_ext_ids = line.get_external_id()
+            # Si tiene ID real lo usa, si no, inventa uno estable usando el ID de base de datos
+            line_xml_id = line_ext_ids.get(line.id) or f"__export__.purchase_order_line_{line.id}"
+            # -------------------------------------
+
+            # Escribir datos
+            sheet.write(row, 0, xml_id)  # Col A: ID Pedido
+            sheet.write(row, 1, line_xml_id)  # Col B: ID Línea (IMPORTANTE)
+            sheet.write(row, 2, po_priority)
+            sheet.write(row, 3, po_name)
+            sheet.write(row, 4, po_partner)
+            sheet.write(row, 5, po_project)
+            sheet.write(row, 6, po_user)
+            sheet.write_datetime(row, 7, po_date, date_fmt)
+            sheet.write(row, 8, activities)
 
             # Datos específicos de la línea
-            sheet.write(row, 8, line.product_id.display_name or '')  # order_line/product_id
-            sheet.write(row, 9, line.name)  # order_line/name
-            sheet.write(row, 10, line.product_qty)  # order_line/product_qty
-            sheet.write(row, 11, line.product_uom_id.name or '')  # order_line/product_uom
-            sheet.write(row, 12, line.price_unit)  # order_line/price_unit
+            sheet.write(row, 9, line.product_id.display_name or '')
+            sheet.write(row, 10, line.name)
+            sheet.write(row, 11, line.product_qty)
+            sheet.write(row, 12, line.product_uom_id.name or '')
+            sheet.write(row, 13, line.price_unit)
 
             row += 1
 
@@ -214,7 +218,7 @@ class PurchaseOrderCustom(models.Model):
 
         # Crear el adjunto
         attachment = self.env['ir.attachment'].create({
-            'name': f'Exportacion_Pedido_de_Compra_{self.name}.xlsx',  # Nombre diferente
+            'name': f'Exportacion_Sistema_{self.name}.xlsx',
             'type': 'binary',
             'datas': file_content,
             'res_model': 'purchase.order',
