@@ -13,6 +13,7 @@ import xlsxwriter
 
 _logger = logging.getLogger(__name__)
 
+
 class PurchaseOrderLineCustom(models.Model):
     _inherit = 'purchase.order.line'
 
@@ -90,7 +91,7 @@ class PurchaseOrderCustom(models.Model):
                 'domain': [('id', 'in', all_new_orders)],
                 'target': 'current',  # Abre en la misma pestaña
             }
-        
+
         return True
 
     def _generate_excel_attachment(self, selected_lines):
@@ -135,6 +136,93 @@ class PurchaseOrderCustom(models.Model):
         })
         return attachment.id
 
+    def _generate_importable_excel(self, selected_lines):
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        sheet = workbook.add_worksheet('Import_Export')
+
+        # Formatos
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#d9d9d9', 'border': 1})
+        date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+
+        # 1. Definir las columnas exactas para importar
+        # Nota: Para order_line, necesitamos product_id y name además del precio para que la importación tenga sentido
+        headers = [
+            'id',  # ID Externo
+            'priority',  # Prioridad
+            'name',  # Referencia del pedido
+            'partner_id',  # Proveedor
+            'project_id',  # Proyecto (si tienes el módulo analítico/proyectos)
+            'user_id',  # Responsable
+            'date_order',  # Fecha del pedido
+            'activity_ids',  # Actividades (Resumen)
+            'order_line/product_id',  # Producto (Línea)
+            'order_line/name',  # Descripción (Línea)
+            'order_line/product_qty',  # Cantidad
+            'order_line/product_uom',  # UdM
+            'order_line/price_unit',  # Precio Unitario
+        ]
+
+        # Escribir Cabeceras
+        for col_num, header in enumerate(headers):
+            sheet.write(0, col_num, header, header_fmt)
+            sheet.set_column(col_num, col_num, 20)
+
+        # 2. Obtener datos de cabecera del Pedido
+        # Intentamos obtener el ID Externo, si no existe, usamos __export__.purchase_order_[id]
+        external_ids = self.get_external_id()
+        xml_id = external_ids.get(self.id) or f"__export__.purchase_order_{self.id}_{self.name.replace('/', '_')}"
+
+        # Datos comunes del pedido (Header)
+        po_priority = self.priority
+        po_name = self.name
+        po_partner = self.partner_id.name
+        # Manejo de error por si no tienes el campo project_id instalado
+        po_project = self.project_id.name if hasattr(self, 'project_id') and self.project_id else ''
+        po_user = self.user_id.name
+        po_date = self.date_order
+
+        # Las actividades son many2many/one2many, las concatenamos
+        activities = ', '.join([a.summary or a.activity_type_id.name for a in self.activity_ids])
+
+        # 3. Escribir las líneas (Una fila por cada línea seleccionada)
+        row = 1
+        for line in selected_lines:
+            # Escribimos los datos de cabecera en CADA fila (necesario para importación en Odoo)
+            sheet.write(row, 0, xml_id)
+            sheet.write(row, 1, po_priority)
+            sheet.write(row, 2, po_name)
+            sheet.write(row, 3, po_partner)
+            sheet.write(row, 4, po_project)
+            sheet.write(row, 5, po_user)
+            sheet.write_datetime(row, 6, po_date, date_fmt)
+            sheet.write(row, 7, activities)
+
+            # Datos específicos de la línea
+            sheet.write(row, 8, line.product_id.display_name or '')  # order_line/product_id
+            sheet.write(row, 9, line.name)  # order_line/name
+            sheet.write(row, 10, line.product_qty)  # order_line/product_qty
+            sheet.write(row, 11, line.product_uom_id.name or '')  # order_line/product_uom
+            sheet.write(row, 12, line.price_unit)  # order_line/price_unit
+
+            row += 1
+
+        workbook.close()
+        output.seek(0)
+        file_content = base64.b64encode(output.read())
+        output.close()
+
+        # Crear el adjunto
+        attachment = self.env['ir.attachment'].create({
+            'name': f'Exportacion_Sistema_{self.name}.xlsx',  # Nombre diferente
+            'type': 'binary',
+            'datas': file_content,
+            'res_model': 'purchase.order',
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        return attachment.id
+
     def action_send_items_by_email(self):
         self.ensure_one()
         selected_lines = self.order_line.filtered(lambda line: line.is_selected_for_email)
@@ -142,10 +230,12 @@ class PurchaseOrderCustom(models.Model):
         if not selected_lines:
             raise UserError("Por favor, seleccione al menos una partida.")
 
-        # Generar Excel
-        attachment_id = self._generate_excel_attachment(selected_lines)
+        # 1. Generar Excel VISUAL (Para el proveedor)
+        attachment_visual_id = self._generate_excel_attachment(selected_lines)
 
-        # Usar plantilla ORIGINAL
+        # 2. Generar Excel DE SISTEMA (Para importar)
+        attachment_import_id = self._generate_importable_excel(selected_lines)
+
         template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines')
 
         return {
@@ -159,7 +249,8 @@ class PurchaseOrderCustom(models.Model):
                 'default_res_ids': [self.id],
                 'default_use_template': True,
                 'default_template_id': template.id,
-                'default_attachment_ids': [(6, 0, [attachment_id])],  # Aquí adjuntamos el Excel
+                # AQUÍ PASAMOS LOS DOS IDs
+                'default_attachment_ids': [(6, 0, [attachment_visual_id, attachment_import_id])],
                 'selected_line_ids': selected_lines.ids
             },
         }
@@ -171,10 +262,12 @@ class PurchaseOrderCustom(models.Model):
         if not selected_lines:
             raise UserError("Por favor, seleccione al menos una partida.")
 
-        # Generar Excel (El mismo excel para ambos casos)
-        attachment_id = self._generate_excel_attachment(selected_lines)
+        # 1. Generar Excel VISUAL
+        attachment_visual_id = self._generate_excel_attachment(selected_lines)
 
-        # Usar la NUEVA plantilla (definida abajo en XML)
+        # 2. Generar Excel DE SISTEMA
+        attachment_import_id = self._generate_importable_excel(selected_lines)
+
         template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines_price')
 
         return {
@@ -188,38 +281,11 @@ class PurchaseOrderCustom(models.Model):
                 'default_res_ids': [self.id],
                 'default_use_template': True,
                 'default_template_id': template.id,
-                'default_attachment_ids': [(6, 0, [attachment_id])],  # Adjuntamos Excel
+                # AQUÍ PASAMOS LOS DOS IDs
+                'default_attachment_ids': [(6, 0, [attachment_visual_id, attachment_import_id])],
                 'selected_line_ids': selected_lines.ids
             },
         }
-    # def action_send_items_by_email(self):
-    #     self.ensure_one()
-    #
-    #     # 2. Filtrar para obtener solo las líneas que el usuario seleccionó
-    #     selected_lines = self.order_line.filtered(lambda line: line.is_selected_for_email)
-    #
-    #     if not selected_lines:
-    #         raise UserError("Por favor, seleccione al menos una partida para enviar por correo electrónico.")
-    #
-    #     # 3. Cargar la plantilla de correo que crearemos en el siguiente paso
-    #     template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines')
-    #
-    #     # 4. Abrir el pop-up del correo electrónico (compositor de correo)
-    #     return {
-    #         'type': 'ir.actions.act_window',
-    #         'view_mode': 'form',
-    #         'res_model': 'mail.compose.message',
-    #         'views': [(False, 'form')],
-    #         'view_id': False,
-    #         'target': 'new',
-    #         'context': {
-    #             'default_model': 'purchase.order',
-    #             'default_res_ids': [self.id],
-    #             'default_use_template': True,
-    #             'default_template_id': template.id,
-    #             'selected_line_ids': selected_lines.ids
-    #         },
-    #     }
 
     def action_create_invoice(self):
         """Create the invoice associated to the PO."""
