@@ -146,68 +146,68 @@ class PurchaseOrderCustom(models.Model):
         date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
         # ------------------------------------------------------------------
-        # 1. CABECERAS EXACTAS (Replicando tu foto del Excel de Odoo)
+        # 1. CABECERAS EXACTAS PARA ACTUALIZACIÓN
         # ------------------------------------------------------------------
+        # Usamos 'order_line/id' en lugar de 'order_line'.
+        # Esto le dice a Odoo: "Aquí va el identificador único de la línea".
         headers = [
-            'id',                     # ID Externo del Pedido
+            'id',  # ID del Pedido (P00046)
             'priority',
-            'name',                   # Referencia
-            'partner_id',             # Proveedor
-            'project_id',             # Proyecto
-            'user_id',                # Responsable
-            'date_order',             # Fecha
-            'activity_ids',           # Actividades
-            'order_line',             # Producto (Nombre visible)
-            'order_line/price_unit',  # Precio Unitario
+            'name',
+            'partner_id',
+            'date_order',
+            'order_line/id',  # <--- LA CLAVE: El ID Único de la línea
+            'order_line/price_unit',  # El dato a actualizar
+            'order_line/product_qty',  # (Opcional) Cantidad
+            'order_line/name',  # (Opcional) Descripción para que te guíes
         ]
 
-        # Escribir cabeceras con ancho ajustado
+        # Escribir cabeceras
         for col_num, header in enumerate(headers):
             sheet.write(0, col_num, header, header_fmt)
-            # Dar más espacio a las columnas importantes
-            width = 30 if header in ['id', 'order_line', 'partner_id'] else 20
+            # Damos espacio extra a las columnas de ID
+            width = 35 if '/id' in header or header == 'id' else 20
             sheet.set_column(col_num, col_num, width)
 
         # ------------------------------------------------------------------
-        # 2. OBTENER DATOS DEL PEDIDO (SE REPETIRÁN EN CADA FILA)
+        # 2. DATOS DEL PEDIDO (CABECERA)
         # ------------------------------------------------------------------
-        # Obtener el ID Externo real para permitir la actualización
         external_ids = self.get_external_id()
-        po_xml_id = external_ids.get(self.id)
-        if not po_xml_id:
-            # Si no existe, generar uno estable
-            po_xml_id = f"__export__.purchase_order_{self.id}"
+        po_xml_id = external_ids.get(self.id) or f"__export__.purchase_order_{self.id}"
 
-        # Datos estáticos del pedido
-        po_priority = self.priority
+        po_priority = str(self.priority) if self.priority else ''
         po_name = self.name
         po_partner = self.partner_id.name
-        # Manejo seguro por si no está instalado el módulo de proyectos
-        po_project = self.project_id.name if hasattr(self, 'project_id') and self.project_id else ''
-        po_user = self.user_id.name
         po_date = self.date_order
-        activities = ', '.join([a.summary or a.activity_type_id.name for a in self.activity_ids])
 
         # ------------------------------------------------------------------
-        # 3. RECORRER LÍNEAS Y ESCRIBIR FILAS
+        # 3. RECORRER LÍNEAS (GENERANDO IDs DE LÍNEA)
         # ------------------------------------------------------------------
         row = 1
         for line in selected_lines:
-            # --- Datos del Pedido (Cabecera) ---
-            sheet.write(row, 0, po_xml_id)
+
+            # --- OBTENER EL ID EXTERNO DE LA LÍNEA ---
+            # Esto es lo que soluciona tu problema. No usamos el nombre.
+            # Usamos el código único (ej: __export__.line_432)
+            line_ext_ids = line.get_external_id()
+            line_xml_id = line_ext_ids.get(line.id)
+
+            if not line_xml_id:
+                # Si no existe, lo creamos estable
+                line_xml_id = f"__export__.purchase_order_line_{line.id}"
+            # -----------------------------------------
+
+            # Escribir fila
+            sheet.write(row, 0, po_xml_id)  # id (Pedido)
             sheet.write(row, 1, po_priority)
             sheet.write(row, 2, po_name)
             sheet.write(row, 3, po_partner)
-            sheet.write(row, 4, po_project)
-            sheet.write(row, 5, po_user)
-            sheet.write_datetime(row, 6, po_date, date_fmt)
-            sheet.write(row, 7, activities)
+            sheet.write_datetime(row, 4, po_date, date_fmt)
 
-            # --- Datos de la Línea (Como en tu foto) ---
-            # Columna 'order_line': Nombre del producto
-            sheet.write(row, 8, line.product_id.display_name or '')
-            # Columna 'order_line/price_unit': Precio
-            sheet.write(row, 9, line.price_unit)
+            sheet.write(row, 5, line_xml_id)  # order_line/id (AQUÍ VA EL ID, NO EL NOMBRE)
+            sheet.write(row, 6, line.price_unit)  # order_line/price_unit
+            sheet.write(row, 7, line.product_qty)
+            sheet.write(row, 8, line.name)  # Descripción (solo informativo)
 
             row += 1
 
@@ -216,9 +216,8 @@ class PurchaseOrderCustom(models.Model):
         file_content = base64.b64encode(output.read())
         output.close()
 
-        # Crear el adjunto
         attachment = self.env['ir.attachment'].create({
-            'name': f'Exportacion_Odoo_Compatible_{self.name}.xlsx',
+            'name': f'Actualizar_Precios_{self.name}.xlsx',
             'type': 'binary',
             'datas': file_content,
             'res_model': 'purchase.order',
