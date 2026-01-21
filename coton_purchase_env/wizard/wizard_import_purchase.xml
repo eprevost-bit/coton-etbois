@@ -10,7 +10,8 @@
                         <field name="file_name" invisible="1"/>
                     </group>
                     <footer>
-                        <button name="action_import_lines" string="Importar y Actualizar" type="object" class="btn-primary"/>
+                        <button name="action_import_lines" string="Importar y Actualizar" type="object"
+                                class="btn-primary"/>
                         <button string="Cancelar" class="btn-secondary" special="cancel"/>
                     </footer>
                 </sheet>
@@ -24,8 +25,5 @@
         <field name="res_model">purchase.import.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
-
-        <field name="binding_model_id" ref="purchase.model_purchase_order"/>
-        <field name="binding_view_types">list</field>
     </record>
 </odoo>

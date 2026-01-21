@@ -25,9 +25,7 @@ class PurchaseOrderLineCustom(models.Model):
 class PurchaseOrderCustom(models.Model):
     _inherit = 'purchase.order'
 
-    # Redefinimos el campo 'state' para eliminar los estados 'sent' e 'intermediate'
-    # y mantener el estado personalizado 'inicial_presu'.
-    # Los estados base de Odoo son: draft, sent, to approve, purchase, done, cancel.
+
     state = fields.Selection([
         ('draft', 'Borrador'),
         ('to approve', 'A Aprobar'),
