@@ -9,30 +9,31 @@ patch(ListController.prototype, {
         this.actionService = useService("action");
     },
 
-    getStaticActionMenuItems() {
-        // 1. Obtenemos el MENÚ MAESTRO (que es un Objeto {})
-        const items = super.getStaticActionMenuItems();
+    // ESTE ES EL NOMBRE CORRECTO PARA LA TUERCA GLOBAL
+    get cogItems() {
+        // 1. Obtenemos la lista existente (debe ser un Array [])
+        const items = super.cogItems;
 
-        // 2. Solo actuamos en Compras
+        // 2. LOG: Si ves esto en consola, ESTAMOS EN EL SITIO CORRECTO
+        console.log("⚙️ ENTRANDO EN TUERCA GLOBAL (cogItems). Items actuales:", items);
+
+        // 3. Verificamos modelo
         if (this.props.resModel === 'purchase.order') {
 
-            console.log("⚙️ INYECTANDO BOTÓN EN EL MENÚ MAESTRO...");
-
-            // 3. Insertamos tu botón como una PROPIEDAD del objeto (sin .push)
-            // Usamos una clave única 'custom_import_excel'
-            items.custom_import_excel = {
-                // Texto que sale en el menú
+            // 4. Inyectamos tu botón
+            // En 'cogItems', items SI es un Array, así que .push funciona perfecto.
+            items.push({
+                name: "import_excel_global_custom",
                 description: "📥 Importar Precios (Excel)",
 
-                // Acción al hacer clic
-                callback: () => {
+                // En la tuerca global, la función se llama 'action'
+                action: () => {
+                    console.log("🚀 Click en Importar Global");
                     this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
                 },
 
-                // IMPORTANTE: Esto le dice a Odoo "Muéstralo siempre"
-                isAvailable: () => true,
-                sequence: 1,
-            };
+                sequence: 1, // Intentamos ponerlo el primero
+            });
         }
 
         return items;
