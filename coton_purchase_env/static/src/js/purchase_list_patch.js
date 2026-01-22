@@ -14,26 +14,33 @@ patch(ListController.prototype, {
     }
 });
 
+/** @odoo-module */
+import { ListController } from "@web/views/list/list_controller";
+import { patch } from "@web/core/utils/patch";
+import { useService } from "@web/core/utils/hooks";
+
 patch(ListController.prototype, {
     setup() {
         super.setup();
-        // ESTO DEBE SALIR AL REFRESCAR LA PÁGINA (sin tocar nada)
-        console.log("👻 LIST CONTROLLER INICIADO. Modelo:", this.props.resModel);
+        this.actionService = useService("action");
     },
+    getStaticActionMenuItems() {
+        // 1. Obtenemos los ítems originales (Importar, Exportar, etc.)
+        const items = super.getStaticActionMenuItems();
 
-    get cogItems() {
-        const items = super.cogItems;
-        console.log("👉 CLICK EN TUERCA DETECTADO en modelo:", this.props.resModel);
-
+        // 2. Verificamos si estamos en Compras
         if (this.props.resModel === 'purchase.order') {
+
+            // 3. Añadimos nuestro botón al final
             items.push({
-                name: "import_excel_global",
+                key: "import_excel_custom", // Importante ponerle una key única
                 description: "📥 Importar Precios (Excel)",
-                action: () => {
+                callback: () => {
                     this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
                 },
             });
         }
+
         return items;
     }
 });
