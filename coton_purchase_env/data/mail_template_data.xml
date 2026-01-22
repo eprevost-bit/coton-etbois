@@ -21,6 +21,7 @@
             <tr>
                 <th style="border: 1px solid #ddd; padding: 8px;">Producto</th>
                 <th style="border: 1px solid #ddd; padding: 8px;">Cantidad</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">UdM</th>
             </tr>
         </thead>
         <tbody>
@@ -29,6 +30,9 @@
                 <tr>
                     <td style="border: 1px solid #ddd; padding: 8px;"><t t-out="line.name or ''"/></td>
                     <td style="border: 1px solid #ddd; padding: 8px;"><t t-out="line.product_qty or ''"/> </td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">
+                        <t t-out="line.product_uom_id.name or ''"/>
+                    </td>
                 </tr>
             </t>
         </tbody>
