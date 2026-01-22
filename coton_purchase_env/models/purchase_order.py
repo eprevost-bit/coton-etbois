@@ -224,7 +224,7 @@ class PurchaseOrderCustom(models.Model):
             sheet.write(row, 5, line.product_id.display_name or '')
             sheet.write(row, 6, line.name)
             sheet.write(row, 7, line.product_qty)
-            sheet.write(row, 8, line.price_unit)
+            sheet.write(row, 8, '0.0')
 
             row += 1
 
