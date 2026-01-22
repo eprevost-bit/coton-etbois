@@ -8,6 +8,15 @@ console.log("✅ EL PARCHE SE HA CARGADO EN MEMORIA (V2)");
 patch(ListController.prototype, {
     setup() {
         super.setup();
+        // ESTO NOS DIRÁ CÓMO SE LLAMAN AHORA LAS FUNCIONES
+        console.log("🕵️‍♂️ MÉTODOS DISPONIBLES:", Object.getOwnPropertyNames(ListController.prototype));
+        console.log("🕵️‍♂️ PROPIEDADES EN SETUP:", Object.keys(this));
+    }
+});
+
+patch(ListController.prototype, {
+    setup() {
+        super.setup();
         // ESTO DEBE SALIR AL REFRESCAR LA PÁGINA (sin tocar nada)
         console.log("👻 LIST CONTROLLER INICIADO. Modelo:", this.props.resModel);
     },
