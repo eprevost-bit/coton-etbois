@@ -20,10 +20,11 @@
     </record>
 
     <record id="action_purchase_import_wizard_global" model="ir.actions.act_window">
-        <field name="name">📥 Importar Precios (Excel)</field>
+        <field name="name">Importar Precios (Excel)</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">purchase.import.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="binding_model_id" eval="False"/>
     </record>
 </odoo>
