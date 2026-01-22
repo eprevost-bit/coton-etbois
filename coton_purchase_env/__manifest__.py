@@ -16,7 +16,7 @@
 
     'assets': {
         'web.assets_backend': [
-            'coton-etbois/static/src/js/purchase_list_patch.js',
+            'coton_purchase_env/static/src/js/purchase_list_patch.js',
         ],
     },
     'installable': True,
