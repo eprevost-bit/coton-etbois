@@ -243,98 +243,76 @@ class PurchaseOrderCustom(models.Model):
         })
         return attachment.id
 
-    # def _generate_importable_excel(self, selected_lines):
-    #     output = io.BytesIO()
-    #     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-    #     sheet = workbook.add_worksheet('Import_Export')
-    #
-    #     # Estilos
-    #     header_fmt = workbook.add_format({'bold': True, 'bg_color': '#d9d9d9', 'border': 1})
-    #     date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
-    #
-    #     # ------------------------------------------------------------------
-    #     # 1. COLUMNAS EXACTAS (Replicando "Quiero actualizar datos")
-    #     # ------------------------------------------------------------------
-    #     headers = [
-    #         'id',  # A: ID Externo del PEDIDO (Para encontrar P00046)
-    #         'order_line/id',  # B: ID Externo de la LÍNEA (¡EL TRUCO! Para actualizar en vez de crear)
-    #         'name',  # Referencia
-    #         'partner_id',  # Proveedor
-    #         'date_order',  # Fecha
-    #         'order_line/product_id',  # Producto
-    #         'order_line/name',  # Descripción
-    #         'order_line/product_qty',  # Cantidad
-    #         'order_line/price_unit',  # Precio Unitario
-    #     ]
-    #
-    #     # Escribir cabeceras
-    #     for col_num, header in enumerate(headers):
-    #         sheet.write(0, col_num, header, header_fmt)
-    #         sheet.set_column(col_num, col_num, 25)
-    #
-    #     # ------------------------------------------------------------------
-    #     # 2. OBTENER ID DEL PEDIDO (CABECERA)
-    #     # ------------------------------------------------------------------
-    #     # Intentamos obtener el ID externo real. Si no tiene, creamos uno estable.
-    #     external_ids = self.get_external_id()
-    #     po_xml_id = external_ids.get(self.id)
-    #     if not po_xml_id:
-    #         # Si se creó a mano no tiene XML_ID, así que inventamos uno que SIEMPRE sea el mismo para este ID
-    #         po_xml_id = f"__export__.purchase_order_{self.id}"
-    #
-    #     # Datos estáticos de cabecera
-    #     po_name = self.name
-    #     po_partner = self.partner_id.name
-    #     po_date = self.date_order
-    #
-    #     # ------------------------------------------------------------------
-    #     # 3. RECORRER LÍNEAS (Aquí está la magia de la actualización)
-    #     # ------------------------------------------------------------------
-    #     row = 1
-    #     for line in selected_lines:
-    #
-    #         # --- OBTENER ID DE LA LÍNEA ---
-    #         # Esto es lo que hace la casilla "Quiero actualizar datos" internamente
-    #         line_ext_ids = line.get_external_id()
-    #         line_xml_id = line_ext_ids.get(line.id)
-    #
-    #         if not line_xml_id:
-    #             # Si la línea no tiene ID externo, generamos uno ESTABLE basado en su ID de base de datos.
-    #             # Al ser estable, Odoo sabrá mañana que "__export__.line_99" es la línea 99 y la actualizará.
-    #             line_xml_id = f"__export__.purchase_order_line_{line.id}"
-    #
-    #         # ------------------------------
-    #
-    #         # Escribir fila
-    #         sheet.write(row, 0, po_xml_id)  # Col A: ID Pedido
-    #         sheet.write(row, 1, line_xml_id)  # Col B: ID Línea (Vital para no duplicar)
-    #         sheet.write(row, 2, po_name)
-    #         sheet.write(row, 3, po_partner)
-    #         sheet.write_datetime(row, 4, po_date, date_fmt)
-    #
-    #         # Datos a editar
-    #         sheet.write(row, 5, line.product_id.display_name or '')
-    #         sheet.write(row, 6, line.name)
-    #         sheet.write(row, 7, line.product_qty)
-    #         sheet.write(row, 8, line.price_unit)
-    #
-    #         row += 1
-    #
-    #     workbook.close()
-    #     output.seek(0)
-    #     file_content = base64.b64encode(output.read())
-    #     output.close()
-    #
-    #     # Crear adjunto
-    #     attachment = self.env['ir.attachment'].create({
-    #         'name': f'Exportacion_Sistema_{self.name}.xlsx',
-    #         'type': 'binary',
-    #         'datas': file_content,
-    #         'res_model': 'purchase.order',
-    #         'res_id': self.id,
-    #         'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    #     })
-    #     return attachment.id
+    def _generate_importable_excel2(self, selected_lines):
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        sheet = workbook.add_worksheet('Import_Export')
+
+        # Estilos
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#d9d9d9', 'border': 1})
+        date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+
+        # 1. COLUMNAS
+        headers = [
+            'id',  # ID Pedido
+            'order_line/id',  # ID Línea
+            'name',  # Referencia
+            'partner_id',  # Proveedor
+            'date_order',  # Fecha
+            'order_line/product_id',  # Producto
+            'order_line/name',  # Descripción
+            'order_line/product_qty',  # Cantidad
+            'order_line/price_unit',  # Precio
+        ]
+
+        for col_num, header in enumerate(headers):
+            sheet.write(0, col_num, header, header_fmt)
+            sheet.set_column(col_num, col_num, 25)
+
+        # 2. OBTENER ID DEL PEDIDO (ASEGURANDO QUE SE GUARDE EN BD)
+        # Aquí usamos la nueva función. Si no tiene ID, Odoo lo creará ahora mismo.
+        po_xml_id = self._ensure_xml_id(self)
+
+        po_name = self.name
+        po_partner = self.partner_id.name
+        po_date = self.date_order
+
+        # 3. RECORRER LÍNEAS
+        row = 1
+        for line in selected_lines:
+            # --- OBTENER ID DE LA LÍNEA (ASEGURANDO QUE SE GUARDE EN BD) ---
+            # Igual aquí. Si la línea no tiene ID, lo creamos en ir.model.data
+            line_xml_id = self._ensure_xml_id(line)
+            # ---------------------------------------------------------------
+
+            # Escribir fila
+            sheet.write(row, 0, po_xml_id)
+            sheet.write(row, 1, line_xml_id)
+            sheet.write(row, 2, po_name)
+            sheet.write(row, 3, po_partner)
+            sheet.write_datetime(row, 4, po_date, date_fmt)
+
+            sheet.write(row, 5, line.product_id.display_name or '')
+            sheet.write(row, 6, line.name)
+            sheet.write(row, 7, line.product_qty)
+            sheet.write(row, 8, line.price_unit)
+
+            row += 1
+
+        workbook.close()
+        output.seek(0)
+        file_content = base64.b64encode(output.read())
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': f'Exportacion_Sistema_{self.name}.xlsx',
+            'type': 'binary',
+            'datas': file_content,
+            'res_model': 'purchase.order',
+            'res_id': self.id,
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        return attachment.id
 
     def action_send_items_by_email(self):
         self.ensure_one()
@@ -379,7 +357,7 @@ class PurchaseOrderCustom(models.Model):
         attachment_visual_id = self._generate_excel_attachment(selected_lines)
 
         # 2. Generar Excel DE SISTEMA
-        attachment_import_id = self._generate_importable_excel(selected_lines)
+        attachment_import_id = self._generate_importable_excel2(selected_lines)
 
         template = self.env.ref('coton_purchase_env.email_template_purchase_selected_lines_price')
 
