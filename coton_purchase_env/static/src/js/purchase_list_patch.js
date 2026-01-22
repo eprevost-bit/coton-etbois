@@ -3,48 +3,36 @@ import { ListController } from "@web/views/list/list_controller";
 import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
 
-// Solo un patch, limpio y ordenado
 patch(ListController.prototype, {
     setup() {
         super.setup();
         this.actionService = useService("action");
-        console.log("👻 SETUP INICIADO: El parche está activo en esta vista.");
     },
 
-    get cogItems() {
-        // Obtenemos la lista original
-        const items = super.cogItems || [];
+    getStaticActionMenuItems() {
+        // 1. Obtenemos el MENÚ MAESTRO (que es un Objeto {})
+        const items = super.getStaticActionMenuItems();
 
-        // LOG CLAVE: Esto saldrá AL REFRESCAR LA PÁGINA (F5), no al dar clic
-        console.log("⚙️ CARGANDO ITEMS DE LA TUERCA. Cantidad actual:", items.length);
-
+        // 2. Solo actuamos en Compras
         if (this.props.resModel === 'purchase.order') {
 
-            // Agregamos el botón con TODAS las variantes posibles para asegurar compatibilidad
-            items.push({
-                key: "import_excel_global_btn",
-                name: "Importar Excel Personalizado",
-                description: "📥 Importar Precios (Excel)", // Texto visible
-                label: "📥 Importar Precios (Excel)",       // Texto visible alternativo
+            console.log("⚙️ INYECTANDO BOTÓN EN EL MENÚ MAESTRO...");
 
-                // Ponemos los 3 métodos para que uno "muerda" el anzuelo
-                action: () => {
-                    console.log("🚀 EJECUTANDO ACCIÓN (vía action)");
-                    this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
-                },
+            // 3. Insertamos tu botón como una PROPIEDAD del objeto (sin .push)
+            // Usamos una clave única 'custom_import_excel'
+            items.custom_import_excel = {
+                // Texto que sale en el menú
+                description: "📥 Importar Precios (Excel)",
+
+                // Acción al hacer clic
                 callback: () => {
-                    console.log("🚀 EJECUTANDO ACCIÓN (vía callback)");
-                    this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
-                },
-                onClick: () => {
-                    console.log("🚀 EJECUTANDO ACCIÓN (vía onClick)");
                     this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
                 },
 
-                sequence: 1, // Intentamos ponerlo EL PRIMERO para verlo fácil
-            });
-
-            console.log("✅ BOTÓN INYECTADO EN LA LISTA.");
+                // IMPORTANTE: Esto le dice a Odoo "Muéstralo siempre"
+                isAvailable: () => true,
+                sequence: 1,
+            };
         }
 
         return items;
