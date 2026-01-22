@@ -19,21 +19,29 @@ patch(ListController.prototype, {
         super.setup();
         this.actionService = useService("action");
     },
+
     getStaticActionMenuItems() {
-        // 1. Obtenemos los ítems originales (Importar, Exportar, etc.)
+        // 1. Obtenemos el objeto original de items
         const items = super.getStaticActionMenuItems();
 
-        // 2. Verificamos si estamos en Compras
+        // 2. DIAGNÓSTICO: Esto te mostrará en la consola qué es exactamente "items"
+        // Verás que es algo como { export: {...}, import: {...} }
+        console.log("🕵️‍♂️ EL OBJETO SECRETOS DE ITEMS ES:", items);
+
+        // 3. Verificamos que estamos en Compras
         if (this.props.resModel === 'purchase.order') {
 
-            // 3. Añadimos nuestro botón al final
-            items.push({
-                key: "import_excel_custom", // Importante ponerle una key única
+            // 4. CORRECCIÓN: No usamos .push().
+            // Añadimos una nueva propiedad al objeto directamente.
+            items.import_excel_custom = {
                 description: "📥 Importar Precios (Excel)",
                 callback: () => {
-                    this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
+                    console.log("🚀 Ejecutando acción de importar...");
+                    // Asegúrate de que este ID sea correcto en tu XML
+                    this.actionService.doAction("coton-etbois.action_purchase_import_wizard_global");
                 },
-            });
+                sequence: 50, // Intentamos ponerlo al final
+            };
         }
 
         return items;
