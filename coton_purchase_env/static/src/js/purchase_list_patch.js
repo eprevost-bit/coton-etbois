@@ -20,26 +20,34 @@ patch(ListController.prototype, {
         this.actionService = useService("action");
     },
 
-    // AQUI ESTÁ LA CLAVE: Usamos 'cogItems' para la tuerca global
     get cogItems() {
         const items = super.cogItems;
 
-        // 2. DIAGNÓSTICO: Para que confirmes que AHORA SÍ es el menú correcto
-        console.log("⚙️ TUERCA GLOBAL ITEMS:", items);
+        // --- EL CHIVATO ---
+        // Esto imprimirá en la consola cómo está hecho el primer botón (ej. "Exportar")
+        // Así sabremos si usa "name", "label", "description", "callback", etc.
+        if (items.length > 0) {
+            console.log("🔍 ESTRUCTURA DE UN BOTÓN REAL:", items[0]);
+            console.log("🔑 LLAVES QUE USA:", Object.keys(items[0]));
+        }
+        // ------------------
 
-        // 3. Verificamos modelo
         if (this.props.resModel === 'purchase.order') {
 
-            // 4. Agregamos tu botón a la lista
+            // INTENTO DE SOLUCIÓN: Usamos 'callback' y duplicamos etiquetas por seguridad
             items.push({
-                name: "import_excel_global_btn",
-                description: "📥 Importar Precios (Excel)",
-                // Esta función se ejecuta al dar clic
-                action: () => {
-                    console.log("🚀 Abriendo Wizard Global...");
+                name: "import_excel_global",       // Identificador interno
+                description: "📥 Importar Precios (Excel)", // Usado en algunos menús
+                label: "📥 Importar Precios (Excel)",       // Usado en otros menús (por si acaso)
+                title: "📥 Importar Precios (Excel)",       // Otra variante posible
+
+                // CAMBIO CLAVE: Usamos 'callback' en lugar de 'action'
+                callback: () => {
+                    console.log("🚀 Click recibido");
                     this.actionService.doAction("coton-etbois.action_purchase_import_wizard_global");
                 },
-                sequence: 10, // Puedes jugar con esto para subirlo o bajarlo
+
+                sequence: 100, // Lo mandamos al final
             });
         }
 
