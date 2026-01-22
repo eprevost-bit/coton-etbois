@@ -3,6 +3,8 @@ import { ListController } from "@web/views/list/list_controller";
 import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
 
+console.log("✅ EL PARCHE SE HA CARGADO EN MEMORIA");
+
 patch(ListController.prototype, {
     setup() {
         super.setup();
@@ -10,22 +12,27 @@ patch(ListController.prototype, {
     },
 
     get cogItems() {
-        // Obtenemos los items originales (Exportar, Importar registros, etc.)
+        // 1. Obtenemos los ítems originales de la tuerca
         const items = super.cogItems;
 
-        // VERIFICACIÓN IMPORTANTE: Solo mostrar en Compras
-        // Si no pones esto, el botón saldrá en Ventas, Inventario, Contactos, etc.
+        // 2. IMPRIMIR EN CONSOLA QUÉ ESTÁ VIENDO ODOO
+        console.log("👉 ABRIENDO TUERCA. MODELO DETECTADO:", this.props.resModel);
+
+        // 3. Verificamos si coincide con 'purchase.order'
         if (this.props.resModel === 'purchase.order') {
+            console.log("🟢 ¡COINCIDENCIA! AGREGANDO BOTÓN AL MENÚ...");
 
             items.push({
                 name: "import_excel_global",
-                description: "📥 Importar Precios (Excel)", // Texto que ve el usuario
+                description: "📥 Importar Precios (Excel)",
                 action: () => {
-                    // AQUÍ LLAMAMOS A TU XML
-                    // Reemplaza 'tu_modulo' con el nombre técnico de tu carpeta
+                    console.log("🚀 EJECUTANDO ACCIÓN DE IMPORTAR");
+                    // Asegúrate de que 'coton-etbois' sea el nombre real de tu carpeta técnica
                     this.actionService.doAction("coton_purchase_env.action_purchase_import_wizard_global");
                 },
             });
+        } else {
+            console.log("🔴 EL BOTÓN NO SE AGREGA PORQUE EL MODELO NO ES 'purchase.order'");
         }
 
         return items;
