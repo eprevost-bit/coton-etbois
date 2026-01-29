@@ -126,7 +126,7 @@ class PurchaseOrderCustom(models.Model):
             sheet.write(row, 1, line.name, border)
             sheet.write(row, 2, line.product_qty, border)
             sheet.write(row, 3, line.product_uom_id.name or '', border)
-            sheet.write(row, 4, line.price_subtotal, currency_style)
+            # sheet.write(row, 4, line.price_subtotal, currency_style)
             row += 1
 
         workbook.close()
